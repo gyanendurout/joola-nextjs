@@ -4,6 +4,7 @@ import KPICard from '@/components/KPICard'
 import BarChartWidget from '@/components/BarChartWidget'
 import LineChartWidget from '@/components/LineChartWidget'
 import DonutChartWidget from '@/components/DonutChartWidget'
+import PostingTimeHeatmap from '@/components/PostingTimeHeatmap'
 import { formatNumber, formatEngagement } from '@/lib/utils'
 import type { IgWeeklySnapshot, IgCommentAnalysis, IgPost, IgLoyalUser, IgComplaintLog } from '@/lib/types'
 import { BarChart2, MessageCircle, TrendingUp, Users, Star, AlertCircle } from 'lucide-react'
@@ -21,7 +22,7 @@ export default async function OverviewPage() {
     { data: complaints },
     { data: weeklySnapshots },
   ] = await Promise.all([
-    supabase.from('joola_ig_posts').select('post_id, engagement_rate').returns<Pick<IgPost, 'post_id' | 'engagement_rate'>[]>(),
+    supabase.from('joola_ig_posts').select('post_id, engagement_rate, day_of_week, hour_of_day').returns<Pick<IgPost, 'post_id' | 'engagement_rate' | 'day_of_week' | 'hour_of_day'>[]>(),
     supabase.from('joola_ig_comments').select('comment_id, username').returns<{comment_id: string; username: string}[]>(),
     supabase.from('joola_ig_comment_analysis').select('sentiment').returns<Pick<IgCommentAnalysis, 'sentiment'>[]>(),
     supabase.from('joola_ig_loyal_users').select('username, loyalty_tier, is_potential_ambassador').returns<Pick<IgLoyalUser, 'username' | 'loyalty_tier' | 'is_potential_ambassador'>[]>(),
@@ -78,6 +79,25 @@ export default async function OverviewPage() {
     name: name.charAt(0).toUpperCase() + name.slice(1),
     value,
   }))
+
+  // Posting-time heatmap: avg engagement by day-of-week × hour-of-day
+  const cellTotals: Record<string, { sum: number; count: number }> = {}
+  for (const p of posts ?? []) {
+    if (!p.day_of_week || p.hour_of_day === null || p.hour_of_day === undefined) continue
+    const key = `${p.day_of_week}-${p.hour_of_day}`
+    if (!cellTotals[key]) cellTotals[key] = { sum: 0, count: 0 }
+    cellTotals[key].sum += p.engagement_rate || 0
+    cellTotals[key].count += 1
+  }
+  const heatmapData = Object.entries(cellTotals).map(([key, { sum, count }]) => {
+    const sep = key.lastIndexOf('-')
+    return {
+      day: key.slice(0, sep),
+      hour: parseInt(key.slice(sep + 1), 10),
+      postCount: count,
+      avgEngagement: count > 0 ? sum / count : 0,
+    }
+  })
 
   return (
     <div className="space-y-6">
@@ -161,6 +181,12 @@ export default async function OverviewPage() {
           colors={['#00d4ff', '#1a5cff', '#a855f7', '#f97316']}
         />
       </div>
+
+      {/* Posting-Time Heatmap */}
+      <PostingTimeHeatmap
+        title="Posting Time vs Engagement"
+        data={heatmapData}
+      />
     </div>
   )
 }
