@@ -34,5 +34,37 @@ export default async function CompetitorsPage() {
     .sort(([, a], [, b]) => b - a)
     .map(([name, count]) => ({ name, count }))
 
-  return <CompetitorsClient allMentions={allMentions} competitorData={competitorData} />
+  // Sentiment-toward-JOOLA per competitor
+  const sentimentByCompetitor: Record<string, { positive: number; neutral: number; negative: number; total: number }> = {}
+  for (const m of allMentions) {
+    if (!m.competitor_name) continue
+    const bucket = sentimentByCompetitor[m.competitor_name] ??= {
+      positive: 0,
+      neutral: 0,
+      negative: 0,
+      total: 0,
+    }
+    const s = (m.sentiment_toward_joola || '').toLowerCase()
+    if (s === 'positive') bucket.positive++
+    else if (s === 'negative') bucket.negative++
+    else bucket.neutral++
+    bucket.total++
+  }
+  const competitorSentimentData = Object.entries(sentimentByCompetitor)
+    .sort(([, a], [, b]) => b.total - a.total)
+    .slice(0, 8)
+    .map(([name, b]) => ({
+      name,
+      Positive: b.positive,
+      Neutral: b.neutral,
+      Negative: b.negative,
+    }))
+
+  return (
+    <CompetitorsClient
+      allMentions={allMentions}
+      competitorData={competitorData}
+      competitorSentimentData={competitorSentimentData}
+    />
+  )
 }

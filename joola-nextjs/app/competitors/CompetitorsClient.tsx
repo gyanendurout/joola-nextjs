@@ -77,9 +77,10 @@ const columns = [
 interface CompetitorsClientProps {
   allMentions: MentionWithUrl[]
   competitorData: { name: string; count: number }[]
+  competitorSentimentData: { name: string; Positive: number; Neutral: number; Negative: number }[]
 }
 
-export default function CompetitorsClient({ allMentions, competitorData }: CompetitorsClientProps) {
+export default function CompetitorsClient({ allMentions, competitorData, competitorSentimentData }: CompetitorsClientProps) {
   const [selectedCompetitor, setSelectedCompetitor] = useState('')
 
   const filtered = useMemo(() => {
@@ -106,6 +107,25 @@ export default function CompetitorsClient({ allMentions, competitorData }: Compe
         height={280}
         horizontal={competitorData.length > 5}
       />
+
+      <div>
+        <BarChartWidget
+          title="Sentiment Toward JOOLA in Comments Mentioning Each Competitor"
+          data={competitorSentimentData}
+          xKey="name"
+          bars={[
+            { key: 'Positive', color: '#10b981' },
+            { key: 'Neutral', color: '#64748b' },
+            { key: 'Negative', color: '#ef4444' },
+          ]}
+          height={300}
+          horizontal={competitorSentimentData.length > 5}
+        />
+        <p className="text-[10px] text-[#64748b] mt-1 px-1">
+          Reveals whether fans mentioning each competitor speak positively, neutrally, or negatively
+          about JOOLA — a signal for switchers vs loyalists.
+        </p>
+      </div>
 
       <div className="bg-[#13131a] border border-[#1e1e2e] rounded-xl p-5">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
