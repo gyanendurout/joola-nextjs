@@ -68,7 +68,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {!collapsed && (
           <button
             onClick={onToggle}
-            className="text-[#64748b] hover:text-white p-1 rounded-md hover:bg-white/5 transition-colors"
+            className="text-[#64748b] hover:text-white p-1 rounded-md hover:bg-white/5 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[#00d4ff]/50"
             aria-label="Collapse sidebar"
             title="Collapse sidebar"
           >
@@ -98,7 +98,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 href={href}
                 title={collapsed ? label : undefined}
                 className={cn(
-                  'flex items-center rounded-lg text-sm font-medium transition-all duration-150',
+                  'flex items-center rounded-lg text-sm font-medium transition-all duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-[#00d4ff]/50',
                   collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
                   active
                     ? 'bg-[#1a5cff]/15 text-[#00d4ff] border border-[#1a5cff]/30'
