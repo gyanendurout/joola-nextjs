@@ -25,7 +25,7 @@ export default async function OverviewPage() {
     supabase.from('joola_ig_comments').select('comment_id, username').returns<{comment_id: string; username: string}[]>(),
     supabase.from('joola_ig_comment_analysis').select('sentiment').returns<Pick<IgCommentAnalysis, 'sentiment'>[]>(),
     supabase.from('joola_ig_loyal_users').select('username, loyalty_tier, is_potential_ambassador').returns<Pick<IgLoyalUser, 'username' | 'loyalty_tier' | 'is_potential_ambassador'>[]>(),
-    supabase.from('joola_ig_complaint_log').select('comment_id').returns<{comment_id: string}[]>(),
+    supabase.from('joola_ig_complaint_log').select('comment_id, joola_responded').returns<Pick<IgComplaintLog, 'comment_id' | 'joola_responded'>[]>(),
     supabase.from('joola_ig_weekly_snapshot').select('*').order('week_start', { ascending: true }).limit(12).returns<IgWeeklySnapshot[]>(),
   ])
 
@@ -39,6 +39,8 @@ export default async function OverviewPage() {
   const uniqueFans = uniqueUsernames.size
   const ambassadors = loyalUsers?.filter((u) => u.is_potential_ambassador).length ?? 0
   const totalComplaints = complaints?.length ?? 0
+  const respondedComplaints = complaints?.filter((c) => c.joola_responded).length ?? 0
+  const responseRate = totalComplaints > 0 ? (respondedComplaints / totalComplaints) * 100 : 0
 
   // Weekly chart data (last 12 weeks)
   const weeklyData = (weeklySnapshots ?? []).slice(-12).map((w) => ({
@@ -120,6 +122,7 @@ export default async function OverviewPage() {
         <KPICard
           title="Complaints"
           value={formatNumber(totalComplaints)}
+          subtitle={totalComplaints > 0 ? `${responseRate.toFixed(0)}% responded` : 'None recorded'}
           icon={<AlertCircle size={16} />}
         />
       </div>

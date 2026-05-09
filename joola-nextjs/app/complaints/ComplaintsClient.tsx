@@ -162,6 +162,10 @@ export default function ComplaintsClient({ allComplaints, allWishlist, categoryD
     )
   }, [allComplaints, selectedCategory])
 
+  const respondedCount = allComplaints.filter((c) => c.joola_responded).length
+  const unrespondedCount = allComplaints.length - respondedCount
+  const responseRate = allComplaints.length > 0 ? (respondedCount / allComplaints.length) * 100 : 0
+
   return (
     <div className="space-y-6">
       <div>
@@ -169,6 +173,22 @@ export default function ComplaintsClient({ allComplaints, allWishlist, categoryD
         <p className="text-sm text-[#94a3b8] mt-1">
           {allComplaints.length} complaints · {allWishlist.length} wishlist items
         </p>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Complaints', value: allComplaints.length.toLocaleString() },
+          { label: 'Responded', value: respondedCount.toLocaleString(), accent: 'emerald' },
+          { label: 'Unresponded', value: unrespondedCount.toLocaleString(), accent: 'red' },
+          { label: 'Response Rate', value: allComplaints.length > 0 ? `${responseRate.toFixed(0)}%` : '—' },
+        ].map(({ label, value, accent }) => (
+          <div key={label} className="bg-[#13131a] border border-[#1e1e2e] rounded-xl p-4">
+            <p className="text-xs text-[#64748b] mb-1">{label}</p>
+            <p className={`text-xl font-bold ${accent === 'emerald' ? 'text-emerald-400' : accent === 'red' ? 'text-red-400' : 'text-white'}`}>
+              {value}
+            </p>
+          </div>
+        ))}
       </div>
 
       <BarChartWidget
