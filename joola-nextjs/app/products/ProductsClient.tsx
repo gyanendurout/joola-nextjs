@@ -66,11 +66,19 @@ const athleteColumns = [
   },
 ]
 
+type EngagementRow = {
+  name: string
+  avgEngagement: number
+  postCount: number
+}
+
 interface ProductsClientProps {
   products: IgProductMention[]
   athletes: IgAthleteMention[]
   productChartData: { name: string; count: number }[]
   athleteChartData: { name: string; count: number }[]
+  productEngagementData: EngagementRow[]
+  athleteEngagementData: EngagementRow[]
 }
 
 export default function ProductsClient({
@@ -78,6 +86,8 @@ export default function ProductsClient({
   athletes,
   productChartData,
   athleteChartData,
+  productEngagementData,
+  athleteEngagementData,
 }: ProductsClientProps) {
   return (
     <div className="space-y-6">
@@ -105,6 +115,35 @@ export default function ProductsClient({
           height={300}
           horizontal={athleteChartData.length > 3}
         />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div>
+          <BarChartWidget
+            title="Avg Engagement Rate by Product (%)"
+            data={productEngagementData}
+            xKey="name"
+            bars={[{ key: 'avgEngagement', color: '#a855f7', name: 'Avg engagement %' }]}
+            height={300}
+            horizontal={productEngagementData.length > 3}
+          />
+          <p className="text-[10px] text-[#64748b] mt-1 px-1">
+            Across the unique posts each product is mentioned in. Min 2 posts.
+          </p>
+        </div>
+        <div>
+          <BarChartWidget
+            title="Avg Engagement Rate by Athlete (%)"
+            data={athleteEngagementData}
+            xKey="name"
+            bars={[{ key: 'avgEngagement', color: '#10b981', name: 'Avg engagement %' }]}
+            height={300}
+            horizontal={athleteEngagementData.length > 3}
+          />
+          <p className="text-[10px] text-[#64748b] mt-1 px-1">
+            Across the unique posts each athlete appears in. Min 2 posts.
+          </p>
+        </div>
       </div>
 
       <div className="bg-[#13131a] border border-[#1e1e2e] rounded-xl p-5">
