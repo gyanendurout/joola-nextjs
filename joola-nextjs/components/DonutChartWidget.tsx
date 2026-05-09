@@ -12,6 +12,7 @@ import {
 interface DonutChartWidgetProps {
   data: { name: string; value: number }[]
   colors?: string[]
+  colorMap?: Record<string, string>
   title?: string
   height?: number
 }
@@ -45,9 +46,18 @@ const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<
 export default function DonutChartWidget({
   data,
   colors = DEFAULT_COLORS,
+  colorMap,
   title,
   height = 260,
 }: DonutChartWidgetProps) {
+  const resolveColor = (name: string, index: number) => {
+    if (colorMap) {
+      const hit = colorMap[name] ?? colorMap[name.toLowerCase()]
+      if (hit) return hit
+    }
+    return colors[index % colors.length]
+  }
+
   return (
     <div className="bg-[#13131a] border border-[#1e1e2e] rounded-xl p-5">
       {title && <h3 className="text-sm font-semibold text-white mb-4">{title}</h3>}
@@ -62,8 +72,8 @@ export default function DonutChartWidget({
             paddingAngle={3}
             dataKey="value"
           >
-            {data.map((_, index) => (
-              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={resolveColor(entry.name, index)} />
             ))}
           </Pie>
           <Tooltip content={<CustomTooltip />} />

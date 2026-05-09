@@ -145,7 +145,12 @@ export default async function OverviewPage() {
         <DonutChartWidget
           title="Sentiment Distribution"
           data={sentimentDonut}
-          colors={['#10b981', '#ef4444', '#64748b', '#f59e0b']}
+          colorMap={{
+            positive: '#10b981',
+            negative: '#ef4444',
+            neutral: '#64748b',
+            unknown: '#f59e0b',
+          }}
         />
         <DonutChartWidget
           title="Post Type Breakdown"
