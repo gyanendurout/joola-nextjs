@@ -8,7 +8,7 @@ import DonutChartWidget from '@/components/DonutChartWidget'
 import InfoTooltip from '@/components/InfoTooltip'
 import { formatNumber } from '@/lib/utils'
 import type { IgComment, IgCommentAnalysis } from '@/lib/types'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, ShoppingCart } from 'lucide-react'
 
 type EnrichedComment = IgComment &
   Partial<Pick<IgCommentAnalysis, 'sentiment' | 'sentiment_score' | 'primary_topic' | 'emotion' | 'is_question' | 'is_complaint' | 'purchase_intent'>> & {
@@ -149,6 +149,11 @@ export default function CommentsClient({
     )
   }, [comments, sentimentFilter])
 
+  const purchaseIntentComments = useMemo(
+    () => comments.filter((c) => c.purchase_intent === true),
+    [comments]
+  )
+
   const hasPostLinks = comments.some((c) => c.post_url)
   const columns = buildColumns(hasPostLinks)
 
@@ -208,6 +213,55 @@ export default function CommentsClient({
           <span><span className="text-red-400 font-medium">Negative</span> — score &lt; –0.2 · complaints, criticism</span>
         </div>
       </div>
+
+      {/* Purchase Intent */}
+      {purchaseIntentComments.length > 0 && (
+        <div className="bg-[#13131a] border border-[#1e1e2e] rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
+            <ShoppingCart size={14} className="text-[#00d4ff]" />
+            Purchase Intent Signals ({purchaseIntentComments.length})
+          </h3>
+          <p className="text-[10px] text-[#64748b] mb-4">
+            Comments where the AI detected intent to buy or strong product interest.
+          </p>
+          <div className="space-y-2">
+            {purchaseIntentComments.map((c) => (
+              <div
+                key={c.comment_id}
+                className="flex items-start gap-3 p-3 rounded-lg bg-[#0a0a0f] border border-[#1e1e2e]"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="text-xs font-medium text-[#00d4ff]">@{c.username}</span>
+                    {c.primary_topic && (
+                      <span className="text-[10px] text-[#94a3b8] bg-[#1e1e2e] px-1.5 py-0.5 rounded capitalize">
+                        {c.primary_topic}
+                      </span>
+                    )}
+                    {c.commented_at && (
+                      <span className="text-[10px] text-[#475569]">
+                        {format(new Date(c.commented_at), 'MMM d, yyyy')}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#94a3b8] leading-relaxed">{c.comment_text}</p>
+                </div>
+                {c.post_url && (
+                  <a
+                    href={c.post_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#00d4ff] hover:text-white transition-colors flex-shrink-0 mt-0.5"
+                    title="View post"
+                  >
+                    <ExternalLink size={13} />
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Table with sentiment filter */}
       <div className="bg-[#13131a] border border-[#1e1e2e] rounded-xl p-5">

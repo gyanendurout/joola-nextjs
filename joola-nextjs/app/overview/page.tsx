@@ -5,6 +5,7 @@ import BarChartWidget from '@/components/BarChartWidget'
 import LineChartWidget from '@/components/LineChartWidget'
 import DonutChartWidget from '@/components/DonutChartWidget'
 import PostingTimeHeatmap from '@/components/PostingTimeHeatmap'
+import ContentCalendar from '@/components/ContentCalendar'
 import { formatNumber, formatEngagement } from '@/lib/utils'
 import type { IgWeeklySnapshot, IgCommentAnalysis, IgPost, IgLoyalUser, IgComplaintLog } from '@/lib/types'
 import { BarChart2, MessageCircle, TrendingUp, Users, Star, AlertCircle } from 'lucide-react'
@@ -22,7 +23,7 @@ export default async function OverviewPage() {
     { data: complaints },
     { data: weeklySnapshots },
   ] = await Promise.all([
-    supabase.from('joola_ig_posts').select('post_id, engagement_rate, day_of_week, hour_of_day').returns<Pick<IgPost, 'post_id' | 'engagement_rate' | 'day_of_week' | 'hour_of_day'>[]>(),
+    supabase.from('joola_ig_posts').select('post_id, engagement_rate, day_of_week, hour_of_day, posted_at').returns<Pick<IgPost, 'post_id' | 'engagement_rate' | 'day_of_week' | 'hour_of_day' | 'posted_at'>[]>(),
     supabase.from('joola_ig_comments').select('comment_id, username').returns<{comment_id: string; username: string}[]>(),
     supabase.from('joola_ig_comment_analysis').select('sentiment').returns<Pick<IgCommentAnalysis, 'sentiment'>[]>(),
     supabase.from('joola_ig_loyal_users').select('username, loyalty_tier, is_potential_ambassador').returns<Pick<IgLoyalUser, 'username' | 'loyalty_tier' | 'is_potential_ambassador'>[]>(),
@@ -48,6 +49,7 @@ export default async function OverviewPage() {
     week: format(new Date(w.week_start), 'MMM d'),
     posts_published: w.posts_published,
     avg_engagement_rate: w.avg_engagement_rate,
+    total_views: w.total_views,
     positive: w.positive_comment_pct,
     negative: w.negative_comment_pct,
     neutral: w.neutral_comment_pct,
@@ -78,6 +80,21 @@ export default async function OverviewPage() {
   const postTypeDonut = Object.entries(postTypeCounts).map(([name, value]) => ({
     name: name.charAt(0).toUpperCase() + name.slice(1),
     value,
+  }))
+
+  // Content calendar: avg engagement by calendar date
+  const dateTotals: Record<string, { sum: number; count: number }> = {}
+  for (const p of posts ?? []) {
+    if (!p.posted_at) continue
+    const date = p.posted_at.slice(0, 10)
+    if (!dateTotals[date]) dateTotals[date] = { sum: 0, count: 0 }
+    dateTotals[date].sum += p.engagement_rate || 0
+    dateTotals[date].count += 1
+  }
+  const calendarData = Object.entries(dateTotals).map(([date, { sum, count }]) => ({
+    date,
+    postCount: count,
+    avgEngagement: count > 0 ? sum / count : 0,
   }))
 
   // Posting-time heatmap: avg engagement by day-of-week × hour-of-day
@@ -148,7 +165,7 @@ export default async function OverviewPage() {
       </div>
 
       {/* Charts Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <BarChartWidget
           title="Posts Published Weekly"
           data={weeklyData}
@@ -160,6 +177,12 @@ export default async function OverviewPage() {
           data={weeklyData}
           xKey="week"
           lines={[{ key: 'avg_engagement_rate', color: '#00d4ff', name: 'Engagement Rate' }]}
+        />
+        <LineChartWidget
+          title="Weekly Reach (Total Views)"
+          data={weeklyData}
+          xKey="week"
+          lines={[{ key: 'total_views', color: '#a855f7', name: 'Total Views' }]}
         />
       </div>
 
@@ -186,6 +209,12 @@ export default async function OverviewPage() {
       <PostingTimeHeatmap
         title="Posting Time vs Engagement"
         data={heatmapData}
+      />
+
+      {/* Content Calendar */}
+      <ContentCalendar
+        title="Content Calendar — Engagement by Day"
+        data={calendarData}
       />
     </div>
   )

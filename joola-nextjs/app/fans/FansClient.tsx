@@ -5,6 +5,7 @@ import KPICard from '@/components/KPICard'
 import DataTable from '@/components/DataTable'
 import { formatNumber } from '@/lib/utils'
 import type { IgLoyalUser } from '@/lib/types'
+import BarChartWidget from '@/components/BarChartWidget'
 import { Star, Users, Trophy } from 'lucide-react'
 
 function AmbassadorScoreBadge({ score }: { score: number }) {
@@ -157,6 +158,20 @@ interface FansClientProps {
 }
 
 export default function FansClient({ allUsers, ambassadorList, superFans, regularFans }: FansClientProps) {
+  const tenureBuckets = [
+    { name: '1–2 mo', count: 0 },
+    { name: '3–6 mo', count: 0 },
+    { name: '7–12 mo', count: 0 },
+    { name: '13+ mo', count: 0 },
+  ]
+  for (const u of allUsers) {
+    const m = u.active_months || 0
+    if (m <= 2) tenureBuckets[0].count++
+    else if (m <= 6) tenureBuckets[1].count++
+    else if (m <= 12) tenureBuckets[2].count++
+    else tenureBuckets[3].count++
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -185,6 +200,20 @@ export default function FansClient({ allUsers, ambassadorList, superFans, regula
           icon={<Trophy size={16} />}
           accent
         />
+      </div>
+
+      {/* Tenure distribution */}
+      <div>
+        <BarChartWidget
+          title="Fan Tenure Distribution"
+          data={tenureBuckets}
+          xKey="name"
+          bars={[{ key: 'count', color: '#1a5cff', name: 'Fans' }]}
+          height={220}
+        />
+        <p className="text-[10px] text-[#64748b] mt-1 px-1">
+          How long fans have been active in months since their first comment.
+        </p>
       </div>
 
       {/* Ambassador explanation */}
