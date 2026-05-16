@@ -17,6 +17,7 @@ const ICONS: Record<string, string[]> = {
   search:    ["M11 19a8 8 0 100-16 8 8 0 000 16z", "M21 21l-4.3-4.3"],
   pipeline:  ["M4 12h4", "M16 12h4", "M10 12h4", "M4 6h16", "M4 18h16"],
   chevrons:  ["M11 17l-5-5 5-5", "M18 17l-5-5 5-5"],
+  news:      ["M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2z", "M7 8h10", "M7 12h10", "M7 16h6"],
 }
 
 function Ic({ paths, size = 16 }: { paths: string[]; size?: number }) {
@@ -61,6 +62,7 @@ const NAV: Array<{ section: string; items: NavItem[] }> = [
     items: [
       { id: 'seo-analyze',    label: 'Run Analysis',       icon: 'pipeline',  href: '/seo-analyze' },
       { id: 'seo-dashboard',  label: 'Search Health',      icon: 'search',    href: '/seo-dashboard' },
+      { id: 'seo-news',       label: 'In News',            icon: 'news',      href: '/seo-news' },
     ],
   },
 ]

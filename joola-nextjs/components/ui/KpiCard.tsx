@@ -1,6 +1,7 @@
 'use client'
 
 import Sparkline from './Sparkline'
+import { Tip } from './Tip'
 
 function fmtShort(v: number): string {
   if (v >= 1_000_000) return (v / 1_000_000).toFixed(1) + 'M'
@@ -11,6 +12,7 @@ function fmtShort(v: number): string {
 interface KpiCardProps {
   label: string
   src?: string
+  tooltip?: string
   value: number | string
   unit?: string
   trend?: number[]
@@ -23,6 +25,7 @@ interface KpiCardProps {
 export default function KpiCard({
   label,
   src,
+  tooltip,
   value,
   unit,
   trend,
@@ -45,7 +48,10 @@ export default function KpiCard({
   return (
     <div className={'kpi ' + variant}>
       <div className="label">
-        <span>{label}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+          {label}
+          {tooltip && <Tip text={tooltip} />}
+        </span>
         {src && <span className="src">{src}</span>}
       </div>
       <div className="row">

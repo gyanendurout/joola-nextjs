@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import KpiCard from '@/components/ui/KpiCard'
 import PostingTimeHeatmap from '@/components/PostingTimeHeatmap'
 import ContentCalendar from '@/components/ContentCalendar'
+import { Tip } from '@/components/ui/Tip'
 import type { IgPost, IgPostAnalysis } from '@/lib/types'
 
 type EnrichedPost = IgPost & Partial<IgPostAnalysis>
@@ -84,6 +85,73 @@ export default function PostsClient({
   const [sortKey, setSortKey] = useState<SortKey>('er')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
+  // Theme matrix sort
+  type ThemeSortKey = 'count' | 'er' | 'views' | 'likes'
+  const [themeSk, setThemeSk] = useState<ThemeSortKey>('count')
+  const [themeSd, setThemeSd] = useState<'asc' | 'desc'>('desc')
+  function themeSort(k: ThemeSortKey) {
+    if (k === themeSk) setThemeSd((d) => (d === 'desc' ? 'asc' : 'desc'))
+    else { setThemeSk(k); setThemeSd('desc') }
+  }
+  function themeArrow(k: ThemeSortKey) {
+    if (k !== themeSk) return <span className="sort-arrow"> ↕</span>
+    return <span className="sort-arrow active"> {themeSd === 'desc' ? '▼' : '▲'}</span>
+  }
+  const sortedThemeRows = useMemo(() => {
+    const d = themeSd === 'desc' ? -1 : 1
+    return [...themeRows].sort((a, b) => {
+      if (themeSk === 'count') return d * (a.count - b.count)
+      if (themeSk === 'er')    return d * (a.avgEr - b.avgEr)
+      if (themeSk === 'views') return d * (a.avgViews - b.avgViews)
+      if (themeSk === 'likes') return d * (a.avgLikes - b.avgLikes)
+      return 0
+    })
+  }, [themeRows, themeSk, themeSd])
+
+  // Athlete table sort
+  type AthleteSortKey = 'count' | 'er' | 'views' | 'likes'
+  const [athleteSk, setAthleteSk] = useState<AthleteSortKey>('er')
+  const [athleteSd, setAthleteSd] = useState<'asc' | 'desc'>('desc')
+  function athleteSort(k: AthleteSortKey) {
+    if (k === athleteSk) setAthleteSd((d) => (d === 'desc' ? 'asc' : 'desc'))
+    else { setAthleteSk(k); setAthleteSd('desc') }
+  }
+  function athleteArrow(k: AthleteSortKey) {
+    if (k !== athleteSk) return <span className="sort-arrow"> ↕</span>
+    return <span className="sort-arrow active"> {athleteSd === 'desc' ? '▼' : '▲'}</span>
+  }
+  const sortedAthleteRows = useMemo(() => {
+    const d = athleteSd === 'desc' ? -1 : 1
+    return [...athleteRows].sort((a, b) => {
+      if (athleteSk === 'count') return d * (a.count - b.count)
+      if (athleteSk === 'er')    return d * (a.avgEr - b.avgEr)
+      if (athleteSk === 'views') return d * (a.avgViews - b.avgViews)
+      if (athleteSk === 'likes') return d * (a.avgLikes - b.avgLikes)
+      return 0
+    })
+  }, [athleteRows, athleteSk, athleteSd])
+
+  // Cadence table sort
+  type CadenceSortKey = 'theme' | 'er'
+  const [cadenceSk, setCadenceSk] = useState<CadenceSortKey>('er')
+  const [cadenceSd, setCadenceSd] = useState<'asc' | 'desc'>('desc')
+  function cadenceSort(k: CadenceSortKey) {
+    if (k === cadenceSk) setCadenceSd((d) => (d === 'desc' ? 'asc' : 'desc'))
+    else { setCadenceSk(k); setCadenceSd('desc') }
+  }
+  function cadenceArrow(k: CadenceSortKey) {
+    if (k !== cadenceSk) return <span className="sort-arrow"> ↕</span>
+    return <span className="sort-arrow active"> {cadenceSd === 'desc' ? '▼' : '▲'}</span>
+  }
+  const sortedCadenceRows = useMemo(() => {
+    const d = cadenceSd === 'desc' ? -1 : 1
+    return [...cadenceRows].sort((a, b) => {
+      if (cadenceSk === 'theme') return d * a.theme.localeCompare(b.theme)
+      if (cadenceSk === 'er')    return d * (a.best.avgEr - b.best.avgEr)
+      return 0
+    })
+  }, [cadenceRows, cadenceSk, cadenceSd])
+
   const types = ['All', ...postTypes.map((t) => t.charAt(0).toUpperCase() + t.slice(1))]
 
   const filtered = useMemo(() => {
@@ -135,16 +203,20 @@ export default function PostsClient({
       {/* KPIs */}
       <div className="section">
         <div className="kpi-grid">
-          <KpiCard variant="joola" label="POSTS PUBLISHED" src="13 wk"
+          <KpiCard variant="joola" label="POSTS PUBLISHED" src="last 13 wk"
+            tooltip="How many times JOOLA posted to Instagram in the last 13 weeks"
             value={kpis.totalPosts} trend={trends.posts}
             delta="▲ +7.0%" dir="up" />
-          <KpiCard label="AVG ENGAGEMENT RATE" src="(L+C)/Reach"
+          <KpiCard label="AVG ENGAGEMENT RATE" src="(likes+comments)/reach"
+            tooltip="Percentage of people who liked or commented — above 6% is excellent, below 3% needs attention"
             value={+(kpis.avgER * 100).toFixed(2)} unit="%"
             trend={trends.er} delta="▼ -2.4%" dir="down" />
-          <KpiCard label="TOTAL VIEWS" src="reels + video"
+          <KpiCard label="TOTAL VIEWS" src="reels + video · 13 wk"
+            tooltip="Combined view count across all Reels and video posts in the last 13 weeks"
             value={kpis.totalViews} trend={trends.views}
             delta="▲ +18.4%" dir="up" />
           <KpiCard label="AVG POST CADENCE" src="posts / week"
+            tooltip="Average number of posts per week — consistency drives algorithm reach"
             value={kpis.avgCadence} trend={trends.posts}
             delta="▲ +0.8" dir="up" />
         </div>
@@ -155,8 +227,8 @@ export default function PostsClient({
         <div className="card-grid cg-2-1">
           <div className="card card-pad-lg">
             <div className="card-head">
-              <h3>POSTING TIME · AVG ENGAGEMENT</h3>
-              <span className="meta">7 days × 24 hours · ER %</span>
+              <h3>POSTING TIME · AVG ENGAGEMENT<Tip text="Best time and day to post for maximum engagement — brighter cells = higher average ER. Use this to schedule future posts." /></h3>
+              <span className="meta">7 days × 24 hours · ER % · all-time</span>
             </div>
             <PostingTimeHeatmap data={heatmapData} />
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10.5, color: 'var(--fg-4)', fontFamily: 'JetBrains Mono' }}>
@@ -165,8 +237,8 @@ export default function PostsClient({
           </div>
           <div className="card card-pad-lg">
             <div className="card-head">
-              <h3>CONTENT CALENDAR</h3>
-              <span className="meta">26 wk · ER intensity</span>
+              <h3>CONTENT CALENDAR<Tip text="Your posting cadence at a glance over 26 weeks — darker green means higher engagement on that day. Gaps show days with no posts." /></h3>
+              <span className="meta">last 26 wk · ER intensity</span>
             </div>
             <ContentCalendar data={calendarData} />
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10.5, color: 'var(--fg-4)', fontFamily: 'JetBrains Mono' }}>
@@ -188,25 +260,25 @@ export default function PostsClient({
       <div className="section">
         <div className="card card-pad-lg">
           <div className="card-head">
-            <h3>CONTENT THEME × FORMAT — AVG ENGAGEMENT</h3>
-            <span className="meta">themes ranked by post count · cells = avg ER %</span>
+            <h3>CONTENT THEME × FORMAT — AVG ENGAGEMENT<Tip text="Which content topics perform best in each format (Reel, Photo, Carousel). Click column headers to sort and find your best-performing combinations." /></h3>
+            <span className="meta">last 13 wk · click headers to sort</span>
           </div>
           <div className="table-wrap">
             <table className="data">
               <thead>
                 <tr>
                   <th>THEME</th>
-                  <th className="num">POSTS</th>
-                  <th className="num">AVG ER</th>
-                  <th className="num">AVG VIEWS</th>
-                  <th className="num">AVG LIKES</th>
+                  <th className="num sortable" onClick={() => themeSort('count')}>POSTS{themeArrow('count')}</th>
+                  <th className="num sortable" onClick={() => themeSort('er')}>AVG ER{themeArrow('er')}</th>
+                  <th className="num sortable" onClick={() => themeSort('views')}>AVG VIEWS{themeArrow('views')}</th>
+                  <th className="num sortable" onClick={() => themeSort('likes')}>AVG LIKES{themeArrow('likes')}</th>
                   {postTypes.map((t) => (
                     <th className="num" key={t} style={{ textTransform: 'capitalize' }}>{t}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {themeRows.map((row) => (
+                {sortedThemeRows.map((row) => (
                   <tr key={row.theme}>
                     <td style={{ fontWeight: 600, textTransform: 'capitalize' }}>
                       {row.theme.replace(/_/g, ' ')}
@@ -246,22 +318,22 @@ export default function PostsClient({
         <div className="card-grid cg-2-1">
           <div className="card card-pad-lg">
             <div className="card-head">
-              <h3>TOP ATHLETES BY ENGAGEMENT</h3>
-              <span className="meta">avg ER per athlete-featuring post</span>
+              <h3>TOP ATHLETES BY ENGAGEMENT<Tip text="Which JOOLA athletes drive the most engagement when featured in posts — helps decide who to feature more often." /></h3>
+              <span className="meta">avg ER per athlete-featuring post · last 13 wk</span>
             </div>
             <div className="table-wrap">
               <table className="data">
                 <thead>
                   <tr>
                     <th>ATHLETE</th>
-                    <th className="num">POSTS</th>
-                    <th className="num">AVG ER</th>
-                    <th className="num">AVG VIEWS</th>
-                    <th className="num">AVG LIKES</th>
+                    <th className="num sortable" onClick={() => athleteSort('count')}>POSTS{athleteArrow('count')}</th>
+                    <th className="num sortable" onClick={() => athleteSort('er')}>AVG ER{athleteArrow('er')}</th>
+                    <th className="num sortable" onClick={() => athleteSort('views')}>AVG VIEWS{athleteArrow('views')}</th>
+                    <th className="num sortable" onClick={() => athleteSort('likes')}>AVG LIKES{athleteArrow('likes')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {athleteRows.map((a) => (
+                  {sortedAthleteRows.map((a) => (
                     <tr key={a.name}>
                       <td style={{ textTransform: 'capitalize', fontWeight: 600 }}>{a.name}</td>
                       <td className="cell-num">{a.count}</td>
@@ -284,8 +356,8 @@ export default function PostsClient({
           <div>
             <div className="card card-pad-lg" style={{ marginBottom: 14 }}>
               <div className="card-head">
-                <h3>CTA EFFECTIVENESS</h3>
-                <span className="meta">avg ER by CTA type</span>
+                <h3>CTA EFFECTIVENESS<Tip text="Which call-to-action phrases in your captions drive the most engagement — tells you what language motivates your audience to interact." /></h3>
+                <span className="meta">avg ER by CTA type · last 13 wk</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {(() => {
@@ -308,8 +380,8 @@ export default function PostsClient({
 
             <div className="card card-pad-lg">
               <div className="card-head">
-                <h3>CAROUSEL LENGTH</h3>
-                <span className="meta">slides vs avg ER</span>
+                <h3>CAROUSEL LENGTH<Tip text="How many slides your carousel posts should have for best engagement — more slides aren't always better." /></h3>
+                <span className="meta">slides vs avg ER · last 13 wk</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {(() => {
@@ -338,21 +410,21 @@ export default function PostsClient({
         <div className="card-grid cg-2-1">
           <div className="card card-pad-lg">
             <div className="card-head">
-              <h3>POSTING CADENCE BY THEME</h3>
-              <span className="meta">best day to post by content theme · avg ER</span>
+              <h3>POSTING CADENCE BY THEME<Tip text="Best day of the week to post each content type for maximum engagement — the yellow bar shows the winning day. Plan your content calendar around these windows." /></h3>
+              <span className="meta">best day to post · avg ER · last 13 wk</span>
             </div>
             <div className="table-wrap">
               <table className="data">
                 <thead>
                   <tr>
-                    <th>THEME</th>
+                    <th className="sortable" onClick={() => cadenceSort('theme')}>THEME{cadenceArrow('theme')}</th>
                     <th>BEST DAY</th>
-                    <th className="num">BEST ER</th>
+                    <th className="num sortable" onClick={() => cadenceSort('er')}>BEST ER{cadenceArrow('er')}</th>
                     <th>RANKING</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {cadenceRows.map((row) => {
+                  {sortedCadenceRows.map((row) => {
                     const max = Math.max(0.0001, ...row.days.map((d) => d.avgEr))
                     return (
                       <tr key={row.theme}>
@@ -392,8 +464,8 @@ export default function PostsClient({
 
           <div className="card card-pad-lg">
             <div className="card-head">
-              <h3>SPONSORED vs ORGANIC</h3>
-              <span className="meta">paid media ROI</span>
+              <h3>SPONSORED vs ORGANIC<Tip text="How paid posts compare to organic content in engagement and views — tells you whether spend is delivering better results than free posts." /></h3>
+              <span className="meta">paid media ROI · last 13 wk</span>
             </div>
             <div>
               {sponsoredRows.map((r) => {
@@ -441,7 +513,7 @@ export default function PostsClient({
       <div className="section">
         <div className="card card-pad-lg">
           <div className="card-head">
-            <h3>ALL POSTS</h3>
+            <h3>ALL POSTS<Tip text="Every post sorted and filterable. Click any column header to sort ascending or descending. CAPT=caption quality, VIS=visual quality, HASH=hashtag relevance, PRED=predicted performance." /></h3>
             <div className="chip-row" style={{ alignItems: 'center' }}>
               {types.map((t) => (
                 <button key={t} className={'chip ' + (typeFilter === t ? 'on' : '')} onClick={() => setTypeFilter(t)}>{t}</button>

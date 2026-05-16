@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { format } from 'date-fns'
 import KpiCard from '@/components/ui/KpiCard'
+import { Tip } from '@/components/ui/Tip'
 import type { IgLoyalUser } from '@/lib/types'
 
 interface FansClientProps {
@@ -27,22 +28,47 @@ function scoreClass(score: number): string {
 }
 
 type FilterType = 'all' | 'ambassador' | 'super' | 'regular' | 'buyers' | 'repeat_complainers' | 'cross_brand'
+type FanSortKey = 'score' | 'comments' | 'sentiment' | 'intent' | 'wishlist' | 'complaints' | 'months'
 
 export default function FansClient({ allUsers, ambassadorList, superFans, regularFans }: FansClientProps) {
   const [filter, setFilter] = useState<FilterType>('all')
   const [search, setSearch] = useState('')
+  const [sk, setSk] = useState<FanSortKey>('score')
+  const [sd, setSd] = useState<'asc' | 'desc'>('desc')
 
-  const filtered = allUsers.filter((u) => {
-    const tier = (u.loyalty_tier || '').toLowerCase()
-    if (filter === 'ambassador' && !u.is_potential_ambassador) return false
-    if (filter === 'super' && !tier.includes('super')) return false
-    if (filter === 'regular' && !tier.includes('regular')) return false
-    if (filter === 'buyers' && (u.purchase_intent_count ?? 0) < 2) return false
-    if (filter === 'repeat_complainers' && (u.complaint_count ?? 0) < 2) return false
-    if (filter === 'cross_brand' && !u.also_comments_on_competitors) return false
-    if (search && !u.username.toLowerCase().includes(search.toLowerCase())) return false
-    return true
-  })
+  function doSort(k: FanSortKey) {
+    if (k === sk) setSd((d) => (d === 'desc' ? 'asc' : 'desc'))
+    else { setSk(k); setSd('desc') }
+  }
+  function arrow(k: FanSortKey) {
+    if (k !== sk) return <span className="sort-arrow"> ↕</span>
+    return <span className="sort-arrow active"> {sd === 'desc' ? '▼' : '▲'}</span>
+  }
+
+  const filtered = useMemo(() => {
+    const base = allUsers.filter((u) => {
+      const tier = (u.loyalty_tier || '').toLowerCase()
+      if (filter === 'ambassador' && !u.is_potential_ambassador) return false
+      if (filter === 'super' && !tier.includes('super')) return false
+      if (filter === 'regular' && !tier.includes('regular')) return false
+      if (filter === 'buyers' && (u.purchase_intent_count ?? 0) < 2) return false
+      if (filter === 'repeat_complainers' && (u.complaint_count ?? 0) < 2) return false
+      if (filter === 'cross_brand' && !u.also_comments_on_competitors) return false
+      if (search && !u.username.toLowerCase().includes(search.toLowerCase())) return false
+      return true
+    })
+    const dir = sd === 'desc' ? -1 : 1
+    return [...base].sort((a, b) => {
+      if (sk === 'score')      return dir * ((a.ambassador_score ?? 0) - (b.ambassador_score ?? 0))
+      if (sk === 'comments')   return dir * ((a.total_comments ?? 0) - (b.total_comments ?? 0))
+      if (sk === 'sentiment')  return dir * ((a.avg_sentiment_score ?? 0) - (b.avg_sentiment_score ?? 0))
+      if (sk === 'intent')     return dir * ((a.purchase_intent_count ?? 0) - (b.purchase_intent_count ?? 0))
+      if (sk === 'wishlist')   return dir * ((a.wishlist_count ?? 0) - (b.wishlist_count ?? 0))
+      if (sk === 'complaints') return dir * ((a.complaint_count ?? 0) - (b.complaint_count ?? 0))
+      if (sk === 'months')     return dir * ((a.active_months ?? 0) - (b.active_months ?? 0))
+      return 0
+    })
+  }, [allUsers, filter, search, sk, sd])
 
   const buyersCount = allUsers.filter((u) => (u.purchase_intent_count ?? 0) >= 2).length
   const repeatComplainers = allUsers.filter((u) => (u.complaint_count ?? 0) >= 2).length
@@ -98,13 +124,17 @@ export default function FansClient({ allUsers, ambassadorList, superFans, regula
       {/* KPIs */}
       <div className="section">
         <div className="kpi-grid">
-          <KpiCard variant="joola" label="TOTAL FANS" src="distinct commenters"
+          <KpiCard variant="joola" label="TOTAL FANS" src="distinct commenters · all-time"
+            tooltip="Total unique people who have ever commented on a JOOLA Instagram post"
             value={allUsers.length} delta="▲ +11.3%" dir="up" />
           <KpiCard label="POTENTIAL AMBASSADORS" src="score ≥ 7.5"
+            tooltip="Fans who comment often, positively, and consistently — strong candidates to represent the brand"
             value={ambassadorList.length} delta="▲ +8%" dir="up" />
           <KpiCard label="SUPER FANS" src="top loyalty tier"
+            tooltip="Your most loyal, most active fans who have been engaging for the longest time"
             value={superFans} delta="—" dir="up" />
           <KpiCard label="AVG FAN TENURE" src="months active"
+            tooltip="Average number of months your fans have been actively commenting — higher means stronger long-term community"
             value={avgTenure} delta="—" dir="up" />
         </div>
       </div>
@@ -115,7 +145,7 @@ export default function FansClient({ allUsers, ambassadorList, superFans, regula
           {/* Pipeline table */}
           <div className="card card-pad-lg">
             <div className="card-head">
-              <h3>AMBASSADOR PIPELINE</h3>
+              <h3>AMBASSADOR PIPELINE<Tip text="All known fans ranked by ambassador score. Filter by type, click column headers to sort. Highlighted rows = potential ambassador picks." /></h3>
               <div className="chip-row" style={{ flexWrap: 'wrap' }}>
                 <button className={'chip ' + (filter === 'all' ? 'on' : '')} onClick={() => setFilter('all')}>All ({allUsers.length})</button>
                 <button className={'chip ' + (filter === 'ambassador' ? 'on' : '')} onClick={() => setFilter('ambassador')}>Ambassador ({ambassadorList.length})</button>
@@ -133,15 +163,15 @@ export default function FansClient({ allUsers, ambassadorList, superFans, regula
                     <th>#</th>
                     <th>USER</th>
                     <th>TIER</th>
-                    <th>TOPIC</th>
-                    <th className="num">SCORE</th>
-                    <th className="num">COMMENTS</th>
-                    <th className="num">SENTIMENT</th>
-                    <th className="num">INTENT</th>
-                    <th className="num">WISH</th>
-                    <th className="num">COMP</th>
-                    <th className="num">MONTHS</th>
-                    <th className="num">FOLLOWERS</th>
+                    <th>TOPIC<Tip text="What this fan talks about most in their comments" /></th>
+                    <th className="num sortable" onClick={() => doSort('score')}>SCORE<Tip text="Ambassador score 0–10 based on frequency, positivity, and consistency of engagement" />{arrow('score')}</th>
+                    <th className="num sortable" onClick={() => doSort('comments')}>COMMENTS<Tip text="Total number of times this fan has commented" />{arrow('comments')}</th>
+                    <th className="num sortable" onClick={() => doSort('sentiment')}>SENTIMENT<Tip text="Average positivity score of this fan's comments — higher is better" />{arrow('sentiment')}</th>
+                    <th className="num sortable" onClick={() => doSort('intent')}>INTENT<Tip text="Number of times this fan showed buying interest in comments" />{arrow('intent')}</th>
+                    <th className="num sortable" onClick={() => doSort('wishlist')}>WISH<Tip text="Number of product or feature requests made by this fan" />{arrow('wishlist')}</th>
+                    <th className="num sortable" onClick={() => doSort('complaints')}>COMP<Tip text="Number of complaints made by this fan — high numbers need attention" />{arrow('complaints')}</th>
+                    <th className="num sortable" onClick={() => doSort('months')}>MONTHS<Tip text="How many months this fan has been actively commenting on JOOLA posts" />{arrow('months')}</th>
+                    <th className="num">FOLLOWERS<Tip text="Instagram follower count — high-follower fans have influencer potential" /></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -236,8 +266,8 @@ export default function FansClient({ allUsers, ambassadorList, superFans, regula
           <div>
             <div className="card card-pad-lg" style={{ marginBottom: 14 }}>
               <div className="card-head">
-                <h3>FAN TENURE</h3>
-                <span className="meta">months active</span>
+                <h3>FAN TENURE<Tip text="Distribution of how long your fans have been engaged — more fans in the 7m+ buckets means a loyal, established community." /></h3>
+                <span className="meta">months active · all-time</span>
               </div>
               {bucketOrder.map((b) => {
                 const n = tenureBuckets[b] ?? 0
@@ -254,7 +284,7 @@ export default function FansClient({ allUsers, ambassadorList, superFans, regula
             </div>
             <div className="card card-pad-lg">
               <div className="card-head">
-                <h3>AMBASSADOR SCORING</h3>
+                <h3>AMBASSADOR SCORING<Tip text="How the 0–10 ambassador score is calculated. Each factor contributes 25%. A score of 7.5+ means they're ready to be approached as a brand advocate." /></h3>
                 <span className="meta">0–10 scale</span>
               </div>
               {[

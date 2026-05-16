@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import KpiCard from '@/components/ui/KpiCard'
 import { Donut, DonutLegend } from '@/components/ui/Donut'
 import type { DonutSlice } from '@/components/ui/Donut'
+import { Tip } from '@/components/ui/Tip'
 import type { IgComment, IgCommentAnalysis, IgWishlistItem } from '@/lib/types'
 
 type EnrichedComment = IgComment &
@@ -257,12 +258,17 @@ export default function CommentsClient({
       {/* KPIs */}
       <div className="section">
         <div className="kpi-grid">
-          <KpiCard label="ALL COMMENTS" src="Instagram" value={totalComments} delta="▲ +18.2%" dir="up" />
+          <KpiCard label="ALL COMMENTS" src="Instagram · all-time"
+            tooltip="Total number of audience comments received across all JOOLA Instagram posts"
+            value={totalComments} delta="▲ +18.2%" dir="up" />
           <KpiCard variant="joola" label="POSITIVE SENTIMENT" src="score > 0.2"
+            tooltip="Percentage of comments with a positive emotional tone — above 60% means your audience loves what you post"
             value={+positivePct.toFixed(1)} unit="%" delta="▲ +1.8pp" dir="up" />
           <KpiCard variant="danger" label="NEGATIVE SENTIMENT" src="score < −0.2"
+            tooltip="Percentage of comments with a negative tone — keep an eye on spikes as they signal a problem post or product issue"
             value={+negativePct.toFixed(1)} unit="%" delta="▲ +0.6pp" dir="down" />
           <KpiCard variant="warn" label="PURCHASE INTENT" src="AI-detected buy signals"
+            tooltip="Comments where fans mention buying, ordering, or wanting a product — these are your warmest leads"
             value={purchaseIntentCount} delta="▲ +14.4%" dir="up" />
         </div>
       </div>
@@ -272,8 +278,8 @@ export default function CommentsClient({
         <div className="card-grid cg-2">
           <div className="card card-pad-lg">
             <div className="card-head">
-              <h3>⚡ FAST STARTS</h3>
-              <span className="meta">most comments in first hour</span>
+              <h3>⚡ FAST STARTS<Tip text="Posts that got a big burst of comments in the first hour after publishing — a strong viral signal that means the algorithm gave them a boost." /></h3>
+              <span className="meta">most comments in first hour · all-time</span>
             </div>
             {viralityFast.length === 0 ? (
               <div className="empty" style={{ fontSize: 11 }}>No fast-start posts yet (need ≥3 comments in first hour).</div>
@@ -301,8 +307,8 @@ export default function CommentsClient({
           </div>
           <div className="card card-pad-lg">
             <div className="card-head">
-              <h3>🐢 SLOW BURNS</h3>
-              <span className="meta">sustained engagement, low first-hour spike</span>
+              <h3>🐢 SLOW BURNS<Tip text="Posts that kept accumulating comments over days rather than spiking early — content with lasting appeal that keeps surfacing in feeds." /></h3>
+              <span className="meta">sustained engagement · all-time</span>
             </div>
             {viralitySlow.length === 0 ? (
               <div className="empty" style={{ fontSize: 11 }}>No slow-burn posts yet (need ≥15 comments and &lt;15% in first hour).</div>
@@ -337,17 +343,17 @@ export default function CommentsClient({
           <div className="card card-pad-lg">
             <div className="card-head">
               <h3>
-                {tab === 'wishlist' ? 'WHAT FANS WANT' :
-                 tab === 'competitors' ? 'COMPETITOR INTEL' :
-                 tab === 'questions' ? 'QUESTION QUEUE' :
-                 tab === 'intent' ? 'PURCHASE SIGNALS' :
-                 tab === 'complaints' ? 'COMPLAINTS' :
-                 'SENTIMENT BREAKDOWN'}
+                {tab === 'wishlist' ? <>WHAT FANS WANT<Tip text="Product and feature requests fans have left in comments — your crowdsourced product roadmap. Filter by category in the sidebar." /></> :
+                 tab === 'competitors' ? <>COMPETITOR INTEL<Tip text="Comments where fans mention other brands — spot comparison shopping, defection risk, and how JOOLA stacks up in the market." /></> :
+                 tab === 'questions' ? <>QUESTION QUEUE<Tip text="Comments where fans are asking something — answer them in replies and use the common questions to build FAQ content." /></> :
+                 tab === 'intent' ? <>PURCHASE SIGNALS<Tip text="Comments from fans who mention buying, ordering, or wanting a product. These are warm leads — consider responding or DM-ing them." /></> :
+                 tab === 'complaints' ? <>COMPLAINTS<Tip text="Negative comments that need a follow-up. Use the filters on the left to prioritize by severity or status." /></> :
+                 <>SENTIMENT BREAKDOWN<Tip text="Every comment with AI-classified sentiment, emotion, topic, and intent. Use the filter chips to drill into positive or negative comments." /></>}
               </h3>
               <span className="meta">
                 {tab === 'wishlist'
-                  ? `${filteredWishlist.length.toLocaleString()} requests`
-                  : `${filtered.length.toLocaleString()} shown`}
+                  ? `${filteredWishlist.length.toLocaleString()} requests · all-time`
+                  : `${filtered.length.toLocaleString()} shown · all-time`}
               </span>
             </div>
 
@@ -498,24 +504,24 @@ export default function CommentsClient({
             {tab === 'competitors' ? (
               <div className="card card-pad-lg" style={{ marginBottom: 14 }}>
                 <div className="card-head">
-                  <h3>COMPETITOR MENTIONS</h3>
-                  <span className="meta">+pos · neutral · −neg</span>
+                  <h3>COMPETITOR MENTIONS<Tip text="How many times each competitor was mentioned, split by positive/neutral/negative context. Green = fans prefer JOOLA, red = fans may be switching." /></h3>
+                  <span className="meta">+pos · neutral · −neg · all-time</span>
                 </div>
                 <CompetitorTable rows={competitorData} />
               </div>
             ) : tab === 'wishlist' ? (
               <div className="card card-pad-lg" style={{ marginBottom: 14 }}>
                 <div className="card-head">
-                  <h3>BY CATEGORY</h3>
-                  <span className="meta">{wishlistCount} requests</span>
+                  <h3>BY CATEGORY<Tip text="Which product or feature categories fans request most — use this to prioritize your roadmap and product development." /></h3>
+                  <span className="meta">{wishlistCount} requests · all-time</span>
                 </div>
                 <HBar data={wishlistCategoryData} colorOf={() => 'var(--yellow)'} />
               </div>
             ) : (
               <div className="card card-pad-lg" style={{ marginBottom: 14 }}>
                 <div className="card-head">
-                  <h3>SENTIMENT MIX</h3>
-                  <span className="meta">{totalComments.toLocaleString()} comments</span>
+                  <h3>SENTIMENT MIX<Tip text="Overall breakdown of positive, neutral, and negative comments — a quick pulse on how your audience feels about JOOLA." /></h3>
+                  <span className="meta">{totalComments.toLocaleString()} comments · all-time</span>
                 </div>
                 <div className="donut-wrap">
                   <Donut data={sentimentSlices} size={140} thickness={22} />
@@ -526,16 +532,16 @@ export default function CommentsClient({
 
             <div className="card card-pad-lg" style={{ marginBottom: 14 }}>
               <div className="card-head">
-                <h3>EMOTION BREAKDOWN</h3>
-                <span className="meta">top {emotionData.length}</span>
+                <h3>EMOTION BREAKDOWN<Tip text="The specific emotions your audience expresses most — Joy and Excited = great content, Anger and Disgust = something needs fixing." /></h3>
+                <span className="meta">top {emotionData.length} · all-time</span>
               </div>
               <HBar data={emotionData} colorOf={emotionColorOf} />
             </div>
 
             <div className="card card-pad-lg">
               <div className="card-head">
-                <h3>TOP TOPICS</h3>
-                <span className="meta">by volume</span>
+                <h3>TOP TOPICS<Tip text="What fans talk about most in their comments — use this to create more content around the topics that already resonate." /></h3>
+                <span className="meta">by volume · all-time</span>
               </div>
               <div className="donut-wrap">
                 <Donut data={topicSlices} size={140} thickness={22} />

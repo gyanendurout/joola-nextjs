@@ -1,0 +1,43 @@
+[scrape_now] run_id  : 1969fce8-5d8b-49e4-bc77-cba4b9c65007
+[scrape_now] sites   : 20
+[scrape_now] started : 2026-05-16T13:42:57.659516+00:00
+
+2026-05-16 19:13:00 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=pickleball.com
+2026-05-16 19:13:15 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=thedinkpickleball.com
+2026-05-16 19:13:15 [info     ] rss_ok                         count=15 path=/feed site=thedinkpickleball.com
+2026-05-16 19:13:17 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=pickleballunion.com
+2026-05-16 19:13:18 [info     ] rss_ok                         count=10 path=/feed site=pickleballunion.com
+2026-05-16 19:13:22 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=pickleballmagazine.com
+2026-05-16 19:13:29 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=usapickleball.org
+2026-05-16 19:13:48 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=ppatour.com
+2026-05-16 19:13:55 [info     ] rss_ok                         count=12 path=/feed site=ppatour.com
+2026-05-16 19:14:03 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=majorleaguepickleball.co
+2026-05-16 19:14:08 [info     ] rss_ok                         count=25 path=/feed site=majorleaguepickleball.co
+2026-05-16 19:14:10 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=theapp.global
+2026-05-16 19:14:18 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=dupr.com
+2026-05-16 19:14:24 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=pickleheads.com
+2026-05-16 19:14:28 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=pickleballcentral.com
+2026-05-16 19:14:31 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=justpaddles.com
+2026-05-16 19:14:37 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=thekitchenpickle.com
+2026-05-16 19:14:42 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=pickleballportal.com
+2026-05-16 19:14:47 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=pickleballstudio.com
+2026-05-16 19:14:51 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=pickleballeffect.com
+2026-05-16 19:14:53 [info     ] rss_ok                         count=8 path=/feed site=pickleballeffect.com
+2026-05-16 19:14:58 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=selkirk.com
+2026-05-16 19:15:05 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=worldpickleballmagazine.com
+2026-05-16 19:15:06 [info     ] rss_ok                         count=10 path=/feed site=worldpickleballmagazine.com
+2026-05-16 19:15:09 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=pickleballnewsasia.com
+2026-05-16 19:15:12 [info     ] rss_ok                         count=10 path=/feed site=pickleballnewsasia.com
+2026-05-16 19:15:14 [info     ] scraping_site                  run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007 site=pickleballtoday.co
+2026-05-16 19:15:25 [warning  ] html_fetch_failed              error='Server disconnected without sending a response.' site=pickleballtoday.co url=https://pickleballtoday.co/
+2026-05-16 19:15:27 [info     ] scrape_complete                articles_found=159 articles_new=7 run_id=1969fce8-5d8b-49e4-bc77-cba4b9c65007
+
+================================================
+[scrape_now] DONE — 2026-05-16T13:45:28.303048+00:00
+  Sites scraped  : 20 / 20
+  Articles found : 159
+  New stored     : 7  (JOOLA-related only)
+  JOOLA-related  : 7
+  Successful     : 20
+  Failed sources : 0
+================================================

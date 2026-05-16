@@ -3,11 +3,13 @@
 import { useState, useMemo } from 'react'
 import { format } from 'date-fns'
 import KpiCard from '@/components/ui/KpiCard'
+import { Tip } from '@/components/ui/Tip'
 import type { IgComplaintLog, IgWishlistItem, IgLoyalUser } from '@/lib/types'
 
 type ComplaintWithUrl = IgComplaintLog & { post_url?: string }
 type WishlistWithUrl = IgWishlistItem & { post_url?: string }
 type RepeatUser = Pick<IgLoyalUser, 'username' | 'complaint_count' | 'dominant_topic' | 'ambassador_score' | 'loyalty_tier' | 'last_seen_at' | 'avg_sentiment_score'>
+type RepeatSortKey = 'complaints' | 'score' | 'sentiment' | 'last_seen'
 
 interface TrendRow { week: string; total: number; cats: Record<string, number> }
 
@@ -37,6 +39,27 @@ export default function ComplaintsClient({
   const [catFilter, setCatFilter] = useState('All')
   const [responded, setResponded] = useState<'all' | 'open' | 'closed'>('all')
   const [view, setView] = useState<'queue' | 'repeat'>('queue')
+  const [repeatSk, setRepeatSk] = useState<RepeatSortKey>('complaints')
+  const [repeatSd, setRepeatSd] = useState<'asc' | 'desc'>('desc')
+
+  function repeatSort(k: RepeatSortKey) {
+    if (k === repeatSk) setRepeatSd((d) => (d === 'desc' ? 'asc' : 'desc'))
+    else { setRepeatSk(k); setRepeatSd('desc') }
+  }
+  function repeatArrow(k: RepeatSortKey) {
+    if (k !== repeatSk) return <span className="sort-arrow"> ↕</span>
+    return <span className="sort-arrow active"> {repeatSd === 'desc' ? '▼' : '▲'}</span>
+  }
+  const sortedRepeat = useMemo(() => {
+    const dir = repeatSd === 'desc' ? -1 : 1
+    return [...repeatComplainers].sort((a, b) => {
+      if (repeatSk === 'complaints') return dir * ((a.complaint_count ?? 0) - (b.complaint_count ?? 0))
+      if (repeatSk === 'score')      return dir * ((a.ambassador_score ?? 0) - (b.ambassador_score ?? 0))
+      if (repeatSk === 'sentiment')  return dir * ((a.avg_sentiment_score ?? 0) - (b.avg_sentiment_score ?? 0))
+      if (repeatSk === 'last_seen')  return dir * (new Date(a.last_seen_at ?? 0).getTime() - new Date(b.last_seen_at ?? 0).getTime())
+      return 0
+    })
+  }, [repeatComplainers, repeatSk, repeatSd])
 
   const totalComplaints = allComplaints.length
   const respondedCount = allComplaints.filter((c) => c.joola_responded).length
@@ -77,13 +100,17 @@ export default function ComplaintsClient({
       {/* KPIs */}
       <div className="section">
         <div className="kpi-grid">
-          <KpiCard variant="danger" label="ALL COMPLAINTS" src="AI-detected"
+          <KpiCard variant="danger" label="ALL COMPLAINTS" src="AI-detected · all-time"
+            tooltip="Total negative comments flagged by AI across all posts — each one represents a fan who had a bad experience"
             value={totalComplaints} delta="▲ +4.2%" dir="down" />
           <KpiCard variant="warn" label="AWAITING RESPONSE" src="open queue"
+            tooltip="Complaints that haven't received a reply yet — every unanswered complaint risks losing that fan"
             value={openCount} delta="—" dir="down" />
           <KpiCard variant="joola" label="RESPONSE RATE" src="complaints responded"
+            tooltip="Percentage of complaints your team has replied to — target 80%+ to show fans you're listening"
             value={+responseRate.toFixed(1)} unit="%" delta="▲ +4.2pp" dir="up" />
           <KpiCard label="REPEAT COMPLAINERS" src="≥2 flagged comments"
+            tooltip="Fans who have complained multiple times — they need priority attention or risk churning"
             value={repeatComplainers.length} delta="—" dir="down" />
         </div>
       </div>
@@ -93,7 +120,7 @@ export default function ComplaintsClient({
         <div className="card-grid cg-2-1">
           <div className="card card-pad-lg">
             <div className="card-head">
-              <h3>COMPLAINT CATEGORY TREND</h3>
+              <h3>COMPLAINT CATEGORY TREND<Tip text="Which types of complaints are growing or shrinking week by week — rising bars signal an emerging problem that needs product or comms attention." /></h3>
               <span className="meta">last {categoryTrend.length} weeks · stacked by category</span>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', height: 140, padding: '8px 0' }}>
@@ -148,8 +175,8 @@ export default function ComplaintsClient({
 
           <div className="card card-pad-lg">
             <div className="card-head">
-              <h3>SEVERITY MIX</h3>
-              <span className="meta">all complaints</span>
+              <h3>SEVERITY MIX<Tip text="How serious your complaints are broken down by level. High = needs immediate response, Medium = respond within 24h, Low = batch review weekly." /></h3>
+              <span className="meta">all complaints · all-time</span>
             </div>
             {severityData.map((s) => {
               const pct = totalComplaints > 0 ? (s.count / totalComplaints) * 100 : 0
@@ -183,7 +210,10 @@ export default function ComplaintsClient({
           {/* Main pane: queue or repeat complainers */}
           <div className="card card-pad-lg">
             <div className="card-head">
-              <h3>{view === 'repeat' ? 'REPEAT COMPLAINERS' : 'COMPLAINT QUEUE'}</h3>
+              <h3>{view === 'repeat'
+                ? <><span>REPEAT COMPLAINERS</span><Tip text="Fans with 2 or more complaints — sort by complaint count to prioritize who needs the most attention. Click column headers to sort." /></>
+                : <><span>COMPLAINT QUEUE</span><Tip text="Individual complaints sorted by time. Filter by status (open/resolved) and category. Always tackle HIGH severity first." /></>
+              }</h3>
               <div className="chip-row">
                 <button className={'chip ' + (view === 'queue' ? 'on' : '')} onClick={() => setView('queue')}>
                   Queue ({totalComplaints})
@@ -261,15 +291,15 @@ export default function ComplaintsClient({
                     <tr>
                       <th>#</th>
                       <th>USER</th>
-                      <th className="num">COMPLAINTS</th>
-                      <th>DOMINANT TOPIC</th>
-                      <th className="num">AMBASSADOR</th>
-                      <th className="num">AVG SENT</th>
-                      <th>LAST SEEN</th>
+                      <th className="num sortable" onClick={() => repeatSort('complaints')}>COMPLAINTS<Tip text="Total number of flagged complaints from this user" />{repeatArrow('complaints')}</th>
+                      <th>DOMINANT TOPIC<Tip text="The topic this user complains about most often" /></th>
+                      <th className="num sortable" onClick={() => repeatSort('score')}>AMBASSADOR<Tip text="Ambassador score — a repeat complainer with a high score may just need attention, not to be written off" />{repeatArrow('score')}</th>
+                      <th className="num sortable" onClick={() => repeatSort('sentiment')}>AVG SENT<Tip text="Average sentiment across all their comments — negative means they're consistently unhappy" />{repeatArrow('sentiment')}</th>
+                      <th className="sortable" onClick={() => repeatSort('last_seen')}>LAST SEEN{repeatArrow('last_seen')}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {repeatComplainers.map((u, i) => (
+                    {sortedRepeat.map((u, i) => (
                       <tr key={u.username}>
                         <td className="mono" style={{ fontSize: 11, color: 'var(--fg-4)' }}>
                           {String(i + 1).padStart(2, '0')}
@@ -312,7 +342,7 @@ export default function ComplaintsClient({
             {/* SLA tracker */}
             <div className="card card-pad-lg" style={{ marginBottom: 14 }}>
               <div className="card-head">
-                <h3>RESPONSE SLA</h3>
+                <h3>RESPONSE SLA<Tip text="How quickly the team responds to complaints. Target is under 60 minutes — faster responses prevent negative word-of-mouth spreading." /></h3>
                 <span className="meta">target 60 min</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
@@ -333,8 +363,8 @@ export default function ComplaintsClient({
             {/* Category breakdown */}
             <div className="card card-pad-lg" style={{ marginBottom: 14 }}>
               <div className="card-head">
-                <h3>BY CATEGORY</h3>
-                <span className="meta">volume</span>
+                <h3>BY CATEGORY<Tip text="Which complaint topics come up most often — the biggest bars are your priority areas to fix." /></h3>
+                <span className="meta">volume · all-time</span>
               </div>
               {categoryData.slice(0, 8).map((d) => (
                 <div className="bar-row" key={d.name}>

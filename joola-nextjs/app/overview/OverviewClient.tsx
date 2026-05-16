@@ -6,6 +6,7 @@ import { Donut, DonutLegend } from '@/components/ui/Donut'
 import type { DonutSlice } from '@/components/ui/Donut'
 import PulseLineChart from '@/components/ui/PulseLineChart'
 import type { ChartSeries } from '@/components/ui/PulseLineChart'
+import { Tip } from '@/components/ui/Tip'
 
 export interface OverviewData {
   lastSync: string
@@ -132,29 +133,35 @@ export default function OverviewClient({ data }: { data: OverviewData }) {
         <>
           <div className="section">
             <div className="kpi-grid">
-              <KpiCard variant="joola" label="TOTAL POSTS" src="Instagram · 13 wk"
+              <KpiCard variant="joola" label="TOTAL POSTS" src="Instagram · last 13 wk"
+                tooltip="How many times JOOLA posted to Instagram in the last 13 weeks"
                 value={data.totalPosts} trend={data.trends.posts}
                 delta={'▲ +' + Math.round(data.totalPosts * 0.07) + ' (' + formatPct(7, true) + ')'}
                 dir="up" />
-              <KpiCard label="COMMENTS" src="all posts · raw"
+              <KpiCard label="COMMENTS" src="all posts · last 13 wk"
+                tooltip="Total audience comments received across all Instagram posts in the last 13 weeks"
                 value={data.totalComments} trend={data.trends.comments}
                 delta={'▲ ' + formatPct(18.2, true)} dir="up" />
               <KpiCard
                 variant={data.avgEngagement < 0.03 ? 'warn' : 'joola'}
                 label="ENGAGEMENT RATE" src="(likes+comments)/reach"
+                tooltip="Average percentage of your audience that liked or commented — above 6% is excellent, below 3% needs attention"
                 value={+(data.avgEngagement * 100).toFixed(2)} unit="%"
                 trend={data.trends.engagement}
                 delta={'▼ ' + formatPct(-2.4, true)} dir="down" />
-              <KpiCard label="UNIQUE FANS" src="distinct commenters"
+              <KpiCard label="UNIQUE FANS" src="distinct commenters · 13 wk"
+                tooltip="How many different people have commented on your posts — a growing number means you're reaching new audiences"
                 value={data.uniqueFans} trend={data.trends.fans}
                 delta={'▲ ' + formatPct(11.3, true)} dir="up" />
             </div>
             <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-              <KpiCard variant="joola" label="POTENTIAL AMBASSADORS" src="score ≥ 7.5"
+              <KpiCard variant="joola" label="POTENTIAL AMBASSADORS" src="score ≥ 7.5 · all-time"
+                tooltip="Fans who comment often, positively, and consistently — strong candidates to represent the brand as ambassadors"
                 value={data.ambassadors} trend={data.trends.ambassadors}
                 delta={'▲ +' + Math.max(1, Math.round(data.ambassadors * 0.08)) + ' (' + formatPct(8, true) + ')'}
                 dir="up" />
-              <KpiCard variant="danger" label="COMPLAINTS" src="AI-detected"
+              <KpiCard variant="danger" label="COMPLAINTS" src="AI-detected · 13 wk"
+                tooltip="Negative comments that need a response — spikes signal a product issue, shipping problem, or PR event"
                 value={data.totalComplaints} trend={data.trends.complaints}
                 delta={'▲ ' + formatPct(4.2, true)} dir="down" />
               <div className="kpi joola">
@@ -175,7 +182,8 @@ export default function OverviewClient({ data }: { data: OverviewData }) {
               </div>
               <KpiCard
                 variant={data.avgResponseTimeMins == null ? 'warn' : data.avgResponseTimeMins <= 60 ? 'joola' : 'danger'}
-                label="AVG RESPONSE TIME" src="target ≤ 60 min"
+                label="AVG RESPONSE TIME" src="target ≤ 60 min · 13 wk"
+                tooltip="How fast the team responds to complaints — under 60 minutes prevents bad experiences from spreading. Green = on target."
                 value={data.avgResponseTimeMins ?? '—'}
                 unit={data.avgResponseTimeMins != null ? ' min' : ''}
                 trend={data.trends.responseTime}
@@ -192,8 +200,8 @@ export default function OverviewClient({ data }: { data: OverviewData }) {
           <div className="card-grid cg-2-1">
             <div className="card card-pad-lg">
               <div className="card-head">
-                <h3>WEEKLY ENGAGEMENT TREND</h3>
-                <span className="meta">13 weeks · Instagram</span>
+                <h3>WEEKLY ENGAGEMENT TREND<Tip text="Weekly breakdown of comments, posts, engagement rate, and purchase signals over 13 weeks — spot spikes, slumps, and seasonal patterns." /></h3>
+                <span className="meta">last 13 weeks · Instagram</span>
               </div>
               <PulseLineChart series={trendSeries} weeks={Math.max(data.weeklyComments.length, 1)} height={240} />
               <div style={{ display: 'flex', gap: 18, marginTop: 14, fontSize: 11, color: 'var(--fg-3)' }}>
@@ -207,7 +215,7 @@ export default function OverviewClient({ data }: { data: OverviewData }) {
             </div>
             <div className="card card-pad-lg">
               <div className="card-head">
-                <h3>POST TYPE MIX</h3>
+                <h3>POST TYPE MIX<Tip text="Split of Reels vs Photos vs Carousels in the last 13 weeks — the Instagram algorithm currently favors Reels for reach." /></h3>
                 <span className="meta">last 13 wk · n={data.postTypes.reduce((s, t) => s + (t.n ?? 0), 0)}</span>
               </div>
               <div className="donut-wrap">
@@ -234,7 +242,7 @@ export default function OverviewClient({ data }: { data: OverviewData }) {
           <div style={{ marginTop: 14 }}>
             <div className="card card-pad-lg">
               <div className="card-head">
-                <h3>CONTENT THEME MOMENTUM</h3>
+                <h3>CONTENT THEME MOMENTUM<Tip text="The dominant content theme for each week — shows whether you're staying consistent or jumping between topics. Consistent themes build stronger audience expectations." /></h3>
                 <span className="meta">dominant theme per week · last {data.themeMomentum.length} wk</span>
               </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'stretch', overflowX: 'auto' }}>
@@ -279,8 +287,8 @@ export default function OverviewClient({ data }: { data: OverviewData }) {
           <div style={{ marginTop: 14 }}>
             <div className="card card-pad-lg">
               <div className="card-head">
-                <h3>SENTIMENT OVERVIEW</h3>
-                <span className="meta">all comments · AI-classified</span>
+                <h3>SENTIMENT OVERVIEW<Tip text="Overall emotional tone of your audience's comments — more green means happy fans. A sudden rise in red requires immediate content or product review." /></h3>
+                <span className="meta">all comments · AI-classified · all-time</span>
               </div>
               <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
                 <Donut data={data.sentimentSlices} size={140} thickness={24} />
@@ -297,8 +305,8 @@ export default function OverviewClient({ data }: { data: OverviewData }) {
           <div className="card-grid cg-2">
             <div className="card card-pad-lg">
               <div className="card-head">
-                <h3>TOP POSTS · LAST 90 DAYS</h3>
-                <span className="meta">↑ by engagement rate</span>
+                <h3>TOP POSTS · LAST 90 DAYS<Tip text="Your best-performing posts in the last 90 days ranked by engagement rate — study these to understand your winning content formula." /></h3>
+                <span className="meta">↑ by engagement rate · last 90 days</span>
               </div>
               <div>
                 {data.topPosts.slice(0, 5).map((p, i) => (
@@ -329,8 +337,8 @@ export default function OverviewClient({ data }: { data: OverviewData }) {
 
             <div className="card card-pad-lg">
               <div className="card-head">
-                <h3>SENTIMENT BY TOPIC</h3>
-                <span className="meta">positive · neutral · negative</span>
+                <h3>SENTIMENT BY TOPIC<Tip text="How positive or negative fans are when discussing each topic — if a specific topic has lots of red, there's a sentiment problem to address there." /></h3>
+                <span className="meta">positive · neutral · negative · all-time</span>
               </div>
               {data.sentimentTopics.length > 0 ? (
                 <div>
@@ -364,7 +372,7 @@ export default function OverviewClient({ data }: { data: OverviewData }) {
         <div className="section">
           <div className="card card-pad-lg">
             <div className="card-head">
-              <h3>LIVE SIGNAL FEED</h3>
+              <h3>LIVE SIGNAL FEED<Tip text="Real-time summary of key brand events — complaints needing response, engagement milestones, ambassador signals, and audience growth." /></h3>
               <span className="meta">
                 <span className="live-pulse-dot" style={{ marginRight: 6 }} />
                 auto-refresh · last 24h
