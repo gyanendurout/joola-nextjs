@@ -17,7 +17,7 @@ Apify actors:
   apify/instagram-profile-scraper
   apify/instagram-comment-scraper
 
-Env (read from joola-nextjs/.env.local):
+Env (read from frontend/.env.local):
   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
   APIFY_API_TOKEN, OPENAI_API_KEY
 """

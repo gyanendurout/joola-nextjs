@@ -27,14 +27,14 @@ Set these in your platform dashboard (Vercel Project Settings → Environment Va
 
 ### Vercel
 1. Import the repo
-2. **Root Directory** → `joola-nextjs`
+2. **Root Directory** → `frontend`
 3. Framework auto-detects as Next.js
 4. Set env vars above
 5. Deploy
 
 ### Railway
 1. New Project → Deploy from GitHub
-2. **Root Directory** → `joola-nextjs`
+2. **Root Directory** → `frontend`
 3. `railway.json` will be picked up (`npm ci && npm run build` build, `npm run start` start)
 4. Set env vars above
 

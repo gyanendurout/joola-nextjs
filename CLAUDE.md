@@ -6,8 +6,8 @@ This file is read automatically by Claude Code at session start. It captures the
 
 ## Project Overview
 
-**Repo:** `c:\Workspace\joola-nextjs` (subfolder: `joola-nextjs\`)  
-**App root:** `c:\Workspace\joola-nextjs\joola-nextjs\`  
+**Repo:** `c:\Workspace\joola-nextjs` (subfolder: `frontend\`)  
+**App root:** `c:\Workspace\joola-nextjs\frontend\`  
 **Stack:** Next.js 14 App Router · TypeScript · Tailwind CSS (kept for compat) · Supabase  
 **Design system:** Design2 (v2) — dark neuro theme, `.v2-root` CSS scope, `--yellow: #F5E625`, `--joola: #22c55e`  
 **Fonts:** Archivo + Archivo Black + JetBrains Mono (loaded via @import in globals.css)  
@@ -32,7 +32,7 @@ Scope: JOOLA's own brand only (Instagram intelligence + SEO intelligence). No co
 
 ## Design System (Design2 / v2)
 
-Reference files: `joola-nextjs/design2/` — **read-only reference, do not run**
+Reference files: `frontend/design2/` — **read-only reference, do not run**
 
 | File | Purpose |
 |------|---------|
@@ -178,7 +178,7 @@ Creates/updates: `news_articles`, `news_scrape_runs`, `news_sources`, `news_scra
 
 ```powershell
 # Next.js (terminal 1)
-cd "C:\Workspace\joola-nextjs\joola-nextjs" ; npm run dev
+cd "C:\Workspace\joola-nextjs\frontend" ; npm run dev
 
 # FastAPI backend (terminal 2)
 cd "C:\Workspace\joola-nextjs\backend"
