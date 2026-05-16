@@ -12,20 +12,31 @@ export interface IgPost {
   thumbnail_url: string
   day_of_week: string
   hour_of_day: number
+  carousel_slide_count: number | null
+  has_cta: boolean | null
+  comments_first_hour: number | null
+  comments_first_24h: number | null
 }
 
 export interface IgPostAnalysis {
   post_id: string
   content_theme: string
+  content_subtheme: string | null
   shot_type: string
   setting: string
   post_intent: string
   sentiment_tone: string
   visual_quality_score: number
+  caption_quality_score: number | null
+  hashtag_relevance_score: number | null
   predicted_performance: string
   caption_summary: string
   athletes_shown: string[]
   products_shown: string[]
+  cta_type: string | null
+  is_sponsored: boolean | null
+  sponsor_brand: string | null
+  tournament_reference: string | null
 }
 
 export interface IgComment {
@@ -48,13 +59,17 @@ export interface IgCommentAnalysis {
   emotion: string
   primary_topic: string
   is_question: boolean
+  question_text: string | null
   is_complaint: boolean
+  complaint_category: string | null
   is_wishlist: boolean
+  wishlist_text: string | null
   mentions_competitor: boolean
-  competitor_mentioned: string
+  competitor_mentioned: string | null
+  competitor_context: string | null
   purchase_intent: boolean
-  product_mentioned: string
-  athlete_mentioned: string
+  product_mentioned: string | null
+  athlete_mentioned: string | null
 }
 
 export interface IgLoyalUser {
@@ -63,14 +78,24 @@ export interface IgLoyalUser {
   total_posts_commented_on: number
   avg_sentiment_score: number
   dominant_emotion: string
+  dominant_topic: string | null
   loyalty_tier: string
   ambassador_score: number
   is_potential_ambassador: boolean
   praise_count: number
   complaint_count: number
+  question_count: number | null
+  purchase_intent_count: number | null
+  competitor_mention_count: number | null
+  wishlist_count: number | null
+  also_comments_on_competitors: boolean | null
   first_seen_at: string
   last_seen_at: string
   active_months: number
+  follower_count: number | null
+  is_verified: boolean | null
+  is_business_account: boolean | null
+  is_potential_influencer: boolean | null
 }
 
 export interface IgUserPostActivity {
@@ -131,6 +156,9 @@ export interface IgWishlistItem {
   username: string
   wishlist_text: string
   category: string
+  product_reference: string | null
+  request_summary: string | null
+  times_similar_requested: number | null
   requested_at: string
 }
 
@@ -157,4 +185,14 @@ export interface IgWeeklySnapshot {
   complaint_count: number
   purchase_intent_count: number
   competitor_mention_count: number
+  wishlist_count: number | null
+  joola_reply_count: number | null
+  avg_joola_response_time_mins: number | null
+  dominant_content_theme: string | null
+  top_post_id: string | null
+  top_post_engagement: number | null
+  new_commenters: number | null
+  returning_commenters: number | null
+  top_emotion: string | null
+  new_super_fans: number | null
 }

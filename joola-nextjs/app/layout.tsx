@@ -1,16 +1,10 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
 import DashboardShell from '@/components/DashboardShell'
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-})
-
 export const metadata: Metadata = {
-  title: 'JOOLA Instagram Intelligence',
-  description: 'Instagram analytics and intelligence dashboard for JOOLA',
+  title: 'JOOLA Pulse',
+  description: 'Own-brand digital intelligence platform for JOOLA',
 }
 
 export default function RootLayout({
@@ -19,8 +13,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={inter.variable}>
-      <body className="bg-[#0a0a0f] text-white min-h-screen">
+    <html lang="en">
+      <body className="v2-root">
         <DashboardShell>{children}</DashboardShell>
       </body>
     </html>

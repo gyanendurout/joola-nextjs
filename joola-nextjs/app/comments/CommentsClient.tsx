@@ -2,293 +2,548 @@
 
 import { useState, useMemo } from 'react'
 import { format } from 'date-fns'
-import DataTable from '@/components/DataTable'
-import SentimentBadge from '@/components/SentimentBadge'
-import DonutChartWidget from '@/components/DonutChartWidget'
-import InfoTooltip from '@/components/InfoTooltip'
-import { formatNumber } from '@/lib/utils'
-import type { IgComment, IgCommentAnalysis } from '@/lib/types'
-import { ExternalLink, ShoppingCart } from 'lucide-react'
+import KpiCard from '@/components/ui/KpiCard'
+import { Donut, DonutLegend } from '@/components/ui/Donut'
+import type { DonutSlice } from '@/components/ui/Donut'
+import type { IgComment, IgCommentAnalysis, IgWishlistItem } from '@/lib/types'
 
 type EnrichedComment = IgComment &
-  Partial<Pick<IgCommentAnalysis, 'sentiment' | 'sentiment_score' | 'primary_topic' | 'emotion' | 'is_question' | 'is_complaint' | 'purchase_intent'>> & {
+  Partial<
+    Pick<
+      IgCommentAnalysis,
+      | 'sentiment'
+      | 'sentiment_score'
+      | 'primary_topic'
+      | 'emotion'
+      | 'is_question'
+      | 'question_text'
+      | 'is_complaint'
+      | 'complaint_category'
+      | 'is_wishlist'
+      | 'wishlist_text'
+      | 'mentions_competitor'
+      | 'competitor_mentioned'
+      | 'competitor_context'
+      | 'purchase_intent'
+    >
+  > & {
     post_url?: string
+    post_type?: string
   }
 
-const SENTIMENT_TOOLTIP = `Sentiment is determined by AI analysis of the comment text.
-Each comment receives a score from –1.0 (most negative) to +1.0 (most positive).
+interface CompetitorRow {
+  name: string
+  count: number
+  pos: number
+  neg: number
+  neu: number
+}
 
-Classification:
-• Positive  → score > 0.2  (praise, enthusiasm, support)
-• Neutral   → –0.2 to 0.2  (questions, informational)
-• Negative  → score < –0.2 (complaints, criticism)
-
-The model evaluates word choice, context, and tone to assign the score.`
-
-function buildColumns(postLinkEnabled: boolean) {
-  return [
-    {
-      key: 'username',
-      header: 'User',
-      sortable: true,
-      render: (row: Record<string, unknown>) => (
-        <span className="font-medium text-white whitespace-nowrap">@{String(row.username || '')}</span>
-      ),
-    },
-    {
-      key: 'comment_text',
-      header: 'Comment',
-      render: (row: Record<string, unknown>) => (
-        <span className="text-[#94a3b8] text-xs leading-relaxed">{String(row.comment_text || '')}</span>
-      ),
-    },
-    {
-      key: 'sentiment',
-      header: 'Sentiment',
-      sortable: true,
-      render: (row: Record<string, unknown>) => <SentimentBadge value={String(row.sentiment || '')} />,
-    },
-    {
-      key: 'sentiment_score',
-      header: 'Score',
-      sortable: true,
-      sortValue: (row: Record<string, unknown>) => Number(row.sentiment_score ?? 0),
-      render: (row: Record<string, unknown>) => {
-        const s = Number(row.sentiment_score ?? null)
-        if (isNaN(s) || row.sentiment_score == null) return <span className="text-[#475569]">—</span>
-        const color = s > 0.2 ? 'text-emerald-400' : s < -0.2 ? 'text-red-400' : 'text-[#94a3b8]'
-        return <span className={`font-mono text-xs font-medium ${color}`}>{s.toFixed(2)}</span>
-      },
-    },
-    {
-      key: 'primary_topic',
-      header: 'Topic',
-      sortable: true,
-      render: (row: Record<string, unknown>) => (
-        <span className="text-xs text-[#94a3b8] bg-[#1e1e2e] px-2 py-0.5 rounded-md capitalize whitespace-nowrap">
-          {String(row.primary_topic || '—')}
-        </span>
-      ),
-    },
-    {
-      key: 'emotion',
-      header: 'Emotion',
-      sortable: true,
-      render: (row: Record<string, unknown>) => (
-        <span className="text-xs text-[#94a3b8] capitalize whitespace-nowrap">{String(row.emotion || '—')}</span>
-      ),
-    },
-    {
-      key: 'likes_on_comment',
-      header: 'Likes',
-      sortable: true,
-      sortValue: (row: Record<string, unknown>) => Math.max(0, Number(row.likes_on_comment || 0)),
-      render: (row: Record<string, unknown>) => {
-        const v = Math.max(0, Number(row.likes_on_comment || 0))
-        return <span className="text-[#94a3b8]">{formatNumber(v)}</span>
-      },
-    },
-    {
-      key: 'commented_at',
-      header: 'Date',
-      sortable: true,
-      sortValue: (row: Record<string, unknown>) => String(row.commented_at || ''),
-      render: (row: Record<string, unknown>) =>
-        row.commented_at ? (
-          <span className="whitespace-nowrap text-[#94a3b8] text-xs">
-            {format(new Date(String(row.commented_at)), 'MMM d, yyyy')}
-          </span>
-        ) : '—',
-    },
-    ...(postLinkEnabled
-      ? [{
-          key: 'post_url',
-          header: 'Post',
-          render: (row: Record<string, unknown>) =>
-            row.post_url ? (
-              <a
-                href={String(row.post_url)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#00d4ff] hover:text-white transition-colors"
-                title="View post on Instagram"
-              >
-                <ExternalLink size={14} />
-              </a>
-            ) : <span className="text-[#334155]">—</span>,
-        }]
-      : []),
-  ]
+interface ViralityRow {
+  post_id: string
+  post_url?: string
+  caption: string
+  post_type: string
+  posted_at: string
+  total_comments: number
+  first_hour: number
+  first_24h: number
+  first_hour_pct: number
 }
 
 interface CommentsClientProps {
   comments: EnrichedComment[]
-  sentimentData: { name: string; value: number }[]
-  topicData: { name: string; value: number }[]
+  wishlist: IgWishlistItem[]
+  sentimentData: Array<{ name: string; value: number }>
+  topicData: Array<{ name: string; value: number }>
+  emotionData: Array<{ name: string; value: number }>
+  competitorData: CompetitorRow[]
+  wishlistCategoryData: Array<{ name: string; value: number }>
   totalComments: number
   uniqueUsers: number
   questionsCount: number
   purchaseIntentCount: number
+  competitorMentionsCount: number
+  wishlistCount: number
+  viralityFast: ViralityRow[]
+  viralitySlow: ViralityRow[]
+}
+
+const SENT_COLORS: Record<string, string> = {
+  positive: 'var(--joola)', neutral: '#94a3b8', negative: 'var(--red)',
+  unknown: 'var(--fg-4)',
+}
+const SENT_PILL: Record<string, string> = {
+  positive: 'pill-green', neutral: 'pill-ghost', negative: 'pill-red', unknown: 'pill-ghost',
+}
+
+const EMOTION_COLORS: Record<string, string> = {
+  joy: 'var(--joola)',
+  happy: 'var(--joola)',
+  excited: 'var(--yellow)',
+  surprise: 'var(--cyan)',
+  neutral: 'var(--fg-4)',
+  curious: 'var(--info)',
+  sadness: 'var(--info)',
+  fear: 'var(--warn)',
+  disgust: 'var(--pink)',
+  anger: 'var(--red)',
+  frustrated: 'var(--red)',
+}
+
+type TabType = 'all' | 'questions' | 'intent' | 'complaints' | 'competitors' | 'wishlist'
+type FilterType = 'all' | 'positive' | 'neutral' | 'negative'
+
+function ScoreTag({ score }: { score: number | undefined | null }) {
+  if (score == null) return null
+  const color = score > 0.2 ? 'var(--joola)' : score < -0.2 ? 'var(--red)' : 'var(--fg-4)'
+  return (
+    <span className="mono" style={{ fontSize: 10, color, fontWeight: 700, border: '1px solid', borderColor: color, padding: '1px 5px', borderRadius: 3 }}>
+      {score > 0 ? '+' : ''}{score.toFixed(2)}
+    </span>
+  )
+}
+
+function HBar({
+  data, colorOf, max,
+}: {
+  data: Array<{ name: string; value: number }>
+  colorOf?: (name: string) => string
+  max?: number
+}) {
+  const cap = max ?? Math.max(1, ...data.map((d) => d.value))
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {data.map((d) => {
+        const pct = (d.value / cap) * 100
+        const c = colorOf ? colorOf(d.name) : 'var(--yellow)'
+        return (
+          <div key={d.name} style={{ display: 'grid', gridTemplateColumns: '88px 1fr 44px', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, color: 'var(--fg-3)', textTransform: 'capitalize' }}>{d.name}</span>
+            <div style={{ height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{ width: pct + '%', height: '100%', background: c, transition: 'width 200ms ease' }} />
+            </div>
+            <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', textAlign: 'right' }}>{d.value.toLocaleString()}</span>
+          </div>
+        )
+      })}
+      {data.length === 0 && <div className="empty" style={{ padding: '10px 0', fontSize: 11 }}>No data.</div>}
+    </div>
+  )
+}
+
+function CompetitorTable({ rows }: { rows: CompetitorRow[] }) {
+  const max = Math.max(1, ...rows.map((r) => r.count))
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {rows.map((r) => {
+        const total = r.count || 1
+        const posPct = (r.pos / total) * 100
+        const negPct = (r.neg / total) * 100
+        const neuPct = (r.neu / total) * 100
+        const barPct = (r.count / max) * 100
+        return (
+          <div key={r.name} style={{ display: 'grid', gridTemplateColumns: '110px 1fr 56px', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, color: 'var(--fg-2)', fontWeight: 600, textTransform: 'capitalize' }}>{r.name}</span>
+            <div>
+              <div style={{ height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden', display: 'flex' }}>
+                <div title={`${r.pos} positive`} style={{ width: (posPct * barPct / 100) + '%', background: 'var(--joola)' }} />
+                <div title={`${r.neu} neutral`}  style={{ width: (neuPct * barPct / 100) + '%', background: '#94a3b8' }} />
+                <div title={`${r.neg} negative`} style={{ width: (negPct * barPct / 100) + '%', background: 'var(--red)' }} />
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 3, fontSize: 9.5, color: 'var(--fg-4)' }} className="mono">
+                <span style={{ color: 'var(--joola)' }}>+{r.pos}</span>
+                <span>·{r.neu}</span>
+                <span style={{ color: 'var(--red)' }}>−{r.neg}</span>
+              </div>
+            </div>
+            <span className="mono" style={{ fontSize: 11, color: 'var(--fg-2)', textAlign: 'right', fontWeight: 700 }}>{r.count}</span>
+          </div>
+        )
+      })}
+      {rows.length === 0 && <div className="empty" style={{ padding: '12px 0', fontSize: 11 }}>No competitor mentions detected yet.</div>}
+    </div>
+  )
 }
 
 export default function CommentsClient({
-  comments,
-  sentimentData,
-  topicData,
-  totalComments,
-  uniqueUsers,
-  questionsCount,
-  purchaseIntentCount,
+  comments, wishlist, sentimentData, topicData, emotionData, competitorData, wishlistCategoryData,
+  totalComments, uniqueUsers, questionsCount, purchaseIntentCount, competitorMentionsCount, wishlistCount,
+  viralityFast, viralitySlow,
 }: CommentsClientProps) {
-  const [sentimentFilter, setSentimentFilter] = useState('')
+  const [tab, setTab] = useState<TabType>('all')
+  const [filter, setFilter] = useState<FilterType>('all')
+  const [search, setSearch] = useState('')
+  const [competitorFilter, setCompetitorFilter] = useState<string>('')
+
+  const positiveCount = comments.filter((c) => (c.sentiment || '').toLowerCase() === 'positive').length
+  const negativeCount = comments.filter((c) => (c.sentiment || '').toLowerCase() === 'negative').length
+  const positivePct = totalComments > 0 ? (positiveCount / totalComments * 100) : 0
+  const negativePct = totalComments > 0 ? (negativeCount / totalComments * 100) : 0
 
   const filtered = useMemo(() => {
-    if (!sentimentFilter) return comments
-    return comments.filter((c) =>
-      (c.sentiment || '').toLowerCase() === sentimentFilter.toLowerCase()
+    return comments.filter((c) => {
+      if (tab === 'questions' && !c.is_question) return false
+      if (tab === 'intent' && !c.purchase_intent) return false
+      if (tab === 'complaints' && !c.is_complaint) return false
+      if (tab === 'competitors') {
+        if (!c.mentions_competitor) return false
+        if (competitorFilter && (c.competitor_mentioned || '').toLowerCase() !== competitorFilter) return false
+      }
+      if (filter !== 'all' && (c.sentiment || '').toLowerCase() !== filter) return false
+      if (search && !c.comment_text?.toLowerCase().includes(search.toLowerCase())) return false
+      return true
+    })
+  }, [comments, tab, filter, search, competitorFilter])
+
+  const filteredWishlist = useMemo(() => {
+    if (tab !== 'wishlist') return wishlist
+    const q = search.toLowerCase()
+    return wishlist.filter((w) =>
+      !q ||
+      w.wishlist_text?.toLowerCase().includes(q) ||
+      (w.category || '').toLowerCase().includes(q) ||
+      (w.username || '').toLowerCase().includes(q)
     )
-  }, [comments, sentimentFilter])
+  }, [wishlist, search, tab])
 
-  const purchaseIntentComments = useMemo(
-    () => comments.filter((c) => c.purchase_intent === true),
-    [comments]
-  )
+  const totalSentiment = sentimentData.reduce((s, d) => s + d.value, 0) || 1
+  const sentimentSlices: DonutSlice[] = sentimentData.map((d) => ({
+    name: d.name,
+    pct: (d.value / totalSentiment) * 100,
+    n: d.value,
+    color: SENT_COLORS[d.name.toLowerCase()] ?? 'var(--fg-4)',
+  }))
 
-  const hasPostLinks = comments.some((c) => c.post_url)
-  const columns = buildColumns(hasPostLinks)
+  const totalTopics = topicData.reduce((s, d) => s + d.value, 0) || 1
+  const topicSlices: DonutSlice[] = topicData.map((d, i) => ({
+    name: d.name,
+    pct: (d.value / totalTopics) * 100,
+    n: d.value,
+    color: ['var(--yellow)', 'var(--joola)', 'var(--info)', 'var(--cyan)', 'var(--warn)', 'var(--pink)'][i % 6],
+  }))
+
+  const emotionColorOf = (n: string) => EMOTION_COLORS[n.toLowerCase()] ?? 'var(--info)'
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Comments</h1>
-        <p className="text-sm text-[#94a3b8] mt-1">
-          {formatNumber(totalComments)} comments · {formatNumber(uniqueUsers)} unique users
-        </p>
-      </div>
-
-      {/* KPI row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Comments', value: formatNumber(totalComments) },
-          { label: 'Unique Users', value: formatNumber(uniqueUsers) },
-          { label: 'Questions', value: formatNumber(questionsCount) },
-          { label: 'Purchase Intent', value: formatNumber(purchaseIntentCount) },
-        ].map(({ label, value }) => (
-          <div key={label} className="bg-[#13131a] border border-[#1e1e2e] rounded-xl p-4">
-            <p className="text-xs text-[#64748b] mb-1">{label}</p>
-            <p className="text-xl font-bold text-white">{value}</p>
+    <div>
+      <header className="page-head">
+        <div>
+          <div className="eyebrow">
+            <span className="live-pulse-dot" />
+            INSTAGRAM · COMMENT INTELLIGENCE
           </div>
-        ))}
-      </div>
+          <h1>COMMENT <em>INTEL</em></h1>
+          <div className="sub">
+            Every comment, AI-classified by sentiment, topic, and intent. Catch complaints early, surface buyers, spot competitor mentions, and find your champions.
+          </div>
+        </div>
+        <div className="head-actions">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 12px' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.3-4.3" />
+            </svg>
+            <input
+              className="fld"
+              placeholder={tab === 'wishlist' ? 'Search wishlist…' : 'Search comments…'}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ border: 0, background: 'transparent', padding: '6px 4px' }}
+            />
+          </div>
+        </div>
+      </header>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <DonutChartWidget
-          title="Sentiment Distribution"
-          data={sentimentData}
-          colorMap={{
-            positive: '#10b981',
-            negative: '#ef4444',
-            neutral: '#64748b',
-            unknown: '#f59e0b',
-          }}
-        />
-        <DonutChartWidget
-          title="Top Topics"
-          data={topicData}
-          colors={['#00d4ff', '#1a5cff', '#a855f7', '#f97316', '#10b981', '#f59e0b']}
-        />
-      </div>
-
-      {/* Sentiment explanation banner */}
-      <div className="bg-[#0d0d14] border border-[#1e1e2e] rounded-xl p-4 text-xs text-[#64748b] leading-relaxed space-y-1">
-        <p className="text-[#94a3b8] font-semibold mb-2 flex items-center gap-1">
-          How sentiment is calculated
-          <InfoTooltip text={SENTIMENT_TOOLTIP} wide />
-        </p>
-        <p>Each comment is scored by an AI model on a scale of <span className="text-white">–1.0 (negative)</span> to <span className="text-white">+1.0 (positive)</span>.</p>
-        <div className="flex flex-wrap gap-4 mt-2">
-          <span><span className="text-emerald-400 font-medium">Positive</span> — score &gt; 0.2 · praise, enthusiasm, support</span>
-          <span><span className="text-[#94a3b8] font-medium">Neutral</span> — –0.2 to 0.2 · questions, general discussion</span>
-          <span><span className="text-red-400 font-medium">Negative</span> — score &lt; –0.2 · complaints, criticism</span>
+      {/* KPIs */}
+      <div className="section">
+        <div className="kpi-grid">
+          <KpiCard label="ALL COMMENTS" src="Instagram" value={totalComments} delta="▲ +18.2%" dir="up" />
+          <KpiCard variant="joola" label="POSITIVE SENTIMENT" src="score > 0.2"
+            value={+positivePct.toFixed(1)} unit="%" delta="▲ +1.8pp" dir="up" />
+          <KpiCard variant="danger" label="NEGATIVE SENTIMENT" src="score < −0.2"
+            value={+negativePct.toFixed(1)} unit="%" delta="▲ +0.6pp" dir="down" />
+          <KpiCard variant="warn" label="PURCHASE INTENT" src="AI-detected buy signals"
+            value={purchaseIntentCount} delta="▲ +14.4%" dir="up" />
         </div>
       </div>
 
-      {/* Purchase Intent */}
-      {purchaseIntentComments.length > 0 && (
-        <div className="bg-[#13131a] border border-[#1e1e2e] rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
-            <ShoppingCart size={14} className="text-[#00d4ff]" />
-            Purchase Intent Signals ({purchaseIntentComments.length})
-          </h3>
-          <p className="text-[10px] text-[#64748b] mb-4">
-            Comments where the AI detected intent to buy or strong product interest.
-          </p>
-          <div className="space-y-2">
-            {purchaseIntentComments.map((c) => (
-              <div
-                key={c.comment_id}
-                className="flex items-start gap-3 p-3 rounded-lg bg-[#0a0a0f] border border-[#1e1e2e]"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="text-xs font-medium text-[#00d4ff]">@{c.username}</span>
-                    {c.primary_topic && (
-                      <span className="text-[10px] text-[#94a3b8] bg-[#1e1e2e] px-1.5 py-0.5 rounded capitalize">
-                        {c.primary_topic}
-                      </span>
-                    )}
-                    {c.commented_at && (
-                      <span className="text-[10px] text-[#475569]">
-                        {format(new Date(c.commented_at), 'MMM d, yyyy')}
-                      </span>
-                    )}
+      {/* Virality indicator */}
+      <div className="section">
+        <div className="card-grid cg-2">
+          <div className="card card-pad-lg">
+            <div className="card-head">
+              <h3>⚡ FAST STARTS</h3>
+              <span className="meta">most comments in first hour</span>
+            </div>
+            {viralityFast.length === 0 ? (
+              <div className="empty" style={{ fontSize: 11 }}>No fast-start posts yet (need ≥3 comments in first hour).</div>
+            ) : (
+              viralityFast.map((v) => (
+                <div key={v.post_id} style={{ padding: '8px 0', borderBottom: '1px solid var(--line-2)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                    <div style={{ fontSize: 12, color: 'var(--fg-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      {v.caption || v.post_id}
+                    </div>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--yellow)', fontWeight: 700 }}>
+                      {Math.round(v.first_hour_pct * 100)}% in 1h
+                    </span>
                   </div>
-                  <p className="text-xs text-[#94a3b8] leading-relaxed">{c.comment_text}</p>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 10.5, color: 'var(--fg-4)' }}>
+                    <span className="mono">{v.first_hour}/1h</span>
+                    <span className="mono">{v.first_24h}/24h</span>
+                    <span className="mono">{v.total_comments} total</span>
+                    <span className="pill pill-ghost" style={{ fontSize: 9, textTransform: 'uppercase' }}>{v.post_type}</span>
+                    {v.post_url && <a href={v.post_url} target="_blank" rel="noopener noreferrer" className="tlink" style={{ fontSize: 10 }}>↗</a>}
+                  </div>
                 </div>
-                {c.post_url && (
-                  <a
-                    href={c.post_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#00d4ff] hover:text-white transition-colors flex-shrink-0 mt-0.5"
-                    title="View post"
+              ))
+            )}
+          </div>
+          <div className="card card-pad-lg">
+            <div className="card-head">
+              <h3>🐢 SLOW BURNS</h3>
+              <span className="meta">sustained engagement, low first-hour spike</span>
+            </div>
+            {viralitySlow.length === 0 ? (
+              <div className="empty" style={{ fontSize: 11 }}>No slow-burn posts yet (need ≥15 comments and &lt;15% in first hour).</div>
+            ) : (
+              viralitySlow.map((v) => (
+                <div key={v.post_id} style={{ padding: '8px 0', borderBottom: '1px solid var(--line-2)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                    <div style={{ fontSize: 12, color: 'var(--fg-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      {v.caption || v.post_id}
+                    </div>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--joola)', fontWeight: 700 }}>
+                      {v.total_comments} comments
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 10.5, color: 'var(--fg-4)' }}>
+                    <span className="mono">{v.first_hour}/1h ({Math.round(v.first_hour_pct * 100)}%)</span>
+                    <span className="mono">{v.first_24h}/24h</span>
+                    <span className="pill pill-ghost" style={{ fontSize: 9, textTransform: 'uppercase' }}>{v.post_type}</span>
+                    {v.post_url && <a href={v.post_url} target="_blank" rel="noopener noreferrer" className="tlink" style={{ fontSize: 10 }}>↗</a>}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main layout: comments list + sidebar */}
+      <div className="section">
+        <div className="card-grid cg-2-1">
+          {/* Main pane */}
+          <div className="card card-pad-lg">
+            <div className="card-head">
+              <h3>
+                {tab === 'wishlist' ? 'WHAT FANS WANT' :
+                 tab === 'competitors' ? 'COMPETITOR INTEL' :
+                 tab === 'questions' ? 'QUESTION QUEUE' :
+                 tab === 'intent' ? 'PURCHASE SIGNALS' :
+                 tab === 'complaints' ? 'COMPLAINTS' :
+                 'SENTIMENT BREAKDOWN'}
+              </h3>
+              <span className="meta">
+                {tab === 'wishlist'
+                  ? `${filteredWishlist.length.toLocaleString()} requests`
+                  : `${filtered.length.toLocaleString()} shown`}
+              </span>
+            </div>
+
+            {/* Tabs */}
+            <div className="tabs" style={{ marginBottom: 12, flexWrap: 'wrap' }}>
+              <button className={'tab ' + (tab === 'all' ? 'on' : '')} onClick={() => setTab('all')}>
+                All ({totalComments.toLocaleString()})
+              </button>
+              <button className={'tab ' + (tab === 'questions' ? 'on' : '')} onClick={() => setTab('questions')}>
+                Questions ({questionsCount})
+              </button>
+              <button className={'tab ' + (tab === 'intent' ? 'on' : '')} onClick={() => setTab('intent')}>
+                Purchase Intent ({purchaseIntentCount})
+              </button>
+              <button className={'tab ' + (tab === 'complaints' ? 'on' : '')} onClick={() => setTab('complaints')}>
+                Complaints ({comments.filter((c) => c.is_complaint).length})
+              </button>
+              <button className={'tab ' + (tab === 'competitors' ? 'on' : '')} onClick={() => setTab('competitors')}>
+                Competitors ({competitorMentionsCount})
+              </button>
+              <button className={'tab ' + (tab === 'wishlist' ? 'on' : '')} onClick={() => setTab('wishlist')}>
+                Wishlist ({wishlistCount})
+              </button>
+            </div>
+
+            {/* Competitor chips (only in competitors tab) */}
+            {tab === 'competitors' && competitorData.length > 0 && (
+              <div className="chip-row" style={{ marginBottom: 12 }}>
+                <button
+                  className={'chip ' + (competitorFilter === '' ? 'on' : '')}
+                  onClick={() => setCompetitorFilter('')}
+                >
+                  All ({competitorMentionsCount})
+                </button>
+                {competitorData.slice(0, 8).map((c) => (
+                  <button
+                    key={c.name}
+                    className={'chip ' + (competitorFilter === c.name ? 'on' : '')}
+                    onClick={() => setCompetitorFilter(c.name)}
+                    style={{ textTransform: 'capitalize' }}
                   >
-                    <ExternalLink size={13} />
-                  </a>
+                    {c.name} ({c.count})
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Sentiment chips (hide on wishlist tab) */}
+            {tab !== 'wishlist' && (
+              <div className="chip-row" style={{ marginBottom: 14 }}>
+                {(['all', 'positive', 'neutral', 'negative'] as FilterType[]).map((f) => (
+                  <button key={f} className={'chip ' + (filter === f ? 'on' : '')} onClick={() => setFilter(f)}>
+                    {f.charAt(0).toUpperCase() + f.slice(1)}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Wishlist rows */}
+            {tab === 'wishlist' ? (
+              <div>
+                {filteredWishlist.slice(0, 80).map((w) => (
+                  <div className="comment-row" key={w.comment_id}>
+                    <div className="comment-user">
+                      <span className="uname">@{w.username}</span>
+                      {w.requested_at && (
+                        <span className="meta">{format(new Date(w.requested_at), 'MMM d')}</span>
+                      )}
+                      {w.category && <span className="pill pill-info" style={{ textTransform: 'capitalize' }}>{w.category}</span>}
+                      {w.product_reference && <span className="pill pill-ghost">{w.product_reference}</span>}
+                      {w.times_similar_requested != null && w.times_similar_requested > 1 && (
+                        <span className="pill pill-yellow">×{w.times_similar_requested} requested</span>
+                      )}
+                    </div>
+                    <div className="comment-body">
+                      <div className="quote">&ldquo;{w.wishlist_text}&rdquo;</div>
+                      {w.request_summary && (
+                        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-4)', marginTop: 6 }}>
+                          → {w.request_summary}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {filteredWishlist.length === 0 && <div className="empty">No wishlist items match your search.</div>}
+                {filteredWishlist.length > 80 && (
+                  <div style={{ padding: '12px 0', textAlign: 'center', fontSize: 11, color: 'var(--fg-4)' }}>
+                    Showing 80 of {filteredWishlist.length} requests
+                  </div>
                 )}
               </div>
-            ))}
+            ) : (
+              /* Comment rows */
+              <div>
+                {filtered.slice(0, 50).map((c, i) => {
+                  const sent = (c.sentiment || 'neutral').toLowerCase()
+                  return (
+                    <div className="comment-row" key={c.comment_id ?? i}>
+                      <div className="comment-user">
+                        <span className="uname">@{c.username}</span>
+                        {c.commented_at && (
+                          <span className="meta">{format(new Date(c.commented_at), 'MMM d')}</span>
+                        )}
+                        {c.post_url && (
+                          <a href={c.post_url} target="_blank" rel="noopener noreferrer"
+                            className="meta tlink">↗ post</a>
+                        )}
+                        {tab === 'competitors' && c.competitor_mentioned && (
+                          <span className="pill pill-yellow" style={{ textTransform: 'capitalize' }}>vs. {c.competitor_mentioned}</span>
+                        )}
+                      </div>
+                      <div className="comment-body">
+                        <div className="quote">&ldquo;{c.comment_text}&rdquo;</div>
+                        {tab === 'competitors' && c.competitor_context && (
+                          <div className="mono" style={{ fontSize: 11, color: 'var(--fg-4)', marginTop: 6 }}>
+                            context: {c.competitor_context}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                          {c.is_question && <span className="pill pill-info">? QUESTION</span>}
+                          {c.purchase_intent && <span className="pill pill-green">● INTENT</span>}
+                          {c.is_complaint && <span className="pill pill-red">⚠ COMPLAINT</span>}
+                          {c.is_wishlist && <span className="pill pill-yellow">★ WISHLIST</span>}
+                          {c.mentions_competitor && tab !== 'competitors' && (
+                            <span className="pill pill-amber">⚐ COMPETITOR</span>
+                          )}
+                          {c.emotion && <span className="pill pill-ghost">{c.emotion}</span>}
+                          {c.primary_topic && <span className="pill pill-ghost">{c.primary_topic}</span>}
+                          <ScoreTag score={c.sentiment_score} />
+                          <span className={'pill ' + (SENT_PILL[sent] ?? 'pill-ghost')}>{sent}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+                {filtered.length === 0 && <div className="empty">No comments match your filters.</div>}
+                {filtered.length > 50 && (
+                  <div style={{ padding: '12px 0', textAlign: 'center', fontSize: 11, color: 'var(--fg-4)' }}>
+                    Showing 50 of {filtered.length} comments
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        </div>
-      )}
 
-      {/* Table with sentiment filter */}
-      <div className="bg-[#13131a] border border-[#1e1e2e] rounded-xl p-5">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-          <h3 className="text-sm font-semibold text-white">
-            All Comments ({formatNumber(filtered.length)}{sentimentFilter ? ` · ${sentimentFilter}` : ''})
-          </h3>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-[#64748b]">Filter by sentiment:</span>
-            <select
-              value={sentimentFilter}
-              onChange={(e) => setSentimentFilter(e.target.value)}
-              className="px-3 py-1.5 bg-[#0a0a0f] border border-[#1e1e2e] rounded-lg text-xs text-white focus:outline-none focus:border-[#00d4ff] transition-colors"
-            >
-              <option value="">All</option>
-              <option value="positive">Positive</option>
-              <option value="neutral">Neutral</option>
-              <option value="negative">Negative</option>
-            </select>
+          {/* Sidebar — context-aware */}
+          <div>
+            {tab === 'competitors' ? (
+              <div className="card card-pad-lg" style={{ marginBottom: 14 }}>
+                <div className="card-head">
+                  <h3>COMPETITOR MENTIONS</h3>
+                  <span className="meta">+pos · neutral · −neg</span>
+                </div>
+                <CompetitorTable rows={competitorData} />
+              </div>
+            ) : tab === 'wishlist' ? (
+              <div className="card card-pad-lg" style={{ marginBottom: 14 }}>
+                <div className="card-head">
+                  <h3>BY CATEGORY</h3>
+                  <span className="meta">{wishlistCount} requests</span>
+                </div>
+                <HBar data={wishlistCategoryData} colorOf={() => 'var(--yellow)'} />
+              </div>
+            ) : (
+              <div className="card card-pad-lg" style={{ marginBottom: 14 }}>
+                <div className="card-head">
+                  <h3>SENTIMENT MIX</h3>
+                  <span className="meta">{totalComments.toLocaleString()} comments</span>
+                </div>
+                <div className="donut-wrap">
+                  <Donut data={sentimentSlices} size={140} thickness={22} />
+                  <DonutLegend data={sentimentSlices} />
+                </div>
+              </div>
+            )}
+
+            <div className="card card-pad-lg" style={{ marginBottom: 14 }}>
+              <div className="card-head">
+                <h3>EMOTION BREAKDOWN</h3>
+                <span className="meta">top {emotionData.length}</span>
+              </div>
+              <HBar data={emotionData} colorOf={emotionColorOf} />
+            </div>
+
+            <div className="card card-pad-lg">
+              <div className="card-head">
+                <h3>TOP TOPICS</h3>
+                <span className="meta">by volume</span>
+              </div>
+              <div className="donut-wrap">
+                <Donut data={topicSlices} size={140} thickness={22} />
+                <DonutLegend data={topicSlices} />
+              </div>
+            </div>
           </div>
         </div>
-        <DataTable
-          data={filtered as unknown as Record<string, unknown>[]}
-          columns={columns}
-          pageSize={25}
-          emptyMessage="No comments found"
-        />
       </div>
     </div>
   )
