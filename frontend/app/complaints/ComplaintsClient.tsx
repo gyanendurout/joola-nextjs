@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { Fragment, useState, useMemo } from 'react'
 import { format } from 'date-fns'
 import KpiCard from '@/components/ui/KpiCard'
 import { Tip } from '@/components/ui/Tip'
@@ -41,6 +41,25 @@ export default function ComplaintsClient({
   const [view, setView] = useState<'queue' | 'repeat'>('queue')
   const [repeatSk, setRepeatSk] = useState<RepeatSortKey>('complaints')
   const [repeatSd, setRepeatSd] = useState<'asc' | 'desc'>('desc')
+  const [expandedUser, setExpandedUser] = useState<string | null>(null)
+
+  // Index complaints by username so the repeat-complainers tab can show the actual comment text.
+  const complaintsByUser = useMemo(() => {
+    const map = new Map<string, ComplaintWithUrl[]>()
+    for (const c of allComplaints) {
+      const u = (c.username || '').toLowerCase()
+      if (!u) continue
+      if (!map.has(u)) map.set(u, [])
+      map.get(u)!.push(c)
+    }
+    // sort newest first within each user
+    map.forEach((arr: ComplaintWithUrl[]) => {
+      arr.sort((a: ComplaintWithUrl, b: ComplaintWithUrl) =>
+        new Date(b.complained_at ?? 0).getTime() - new Date(a.complained_at ?? 0).getTime()
+      )
+    })
+    return map
+  }, [allComplaints])
 
   function repeatSort(k: RepeatSortKey) {
     if (k === repeatSk) setRepeatSd((d) => (d === 'desc' ? 'asc' : 'desc'))
@@ -123,45 +142,63 @@ export default function ComplaintsClient({
               <h3>COMPLAINT CATEGORY TREND<Tip text="Which types of complaints are growing or shrinking week by week — rising bars signal an emerging problem that needs product or comms attention." /></h3>
               <span className="meta">last {categoryTrend.length} weeks · stacked by category</span>
             </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', height: 140, padding: '8px 0' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', minHeight: 140, padding: '8px 0' }}>
               {categoryTrend.length === 0 && <div className="empty">No weekly data yet.</div>}
-              {categoryTrend.map((w) => {
+              {(() => {
+                const MAX_BAR_PX = 110
                 const max = Math.max(1, ...categoryTrend.map((r) => r.total))
-                const colTotal = w.total
-                const heightPct = (colTotal / max) * 100
-                return (
-                  <div key={w.week} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                    <div style={{
-                      height: heightPct + '%',
-                      minHeight: colTotal > 0 ? 2 : 0,
-                      width: '100%',
-                      maxWidth: 28,
-                      display: 'flex',
-                      flexDirection: 'column-reverse',
-                      borderRadius: 3,
-                      overflow: 'hidden',
-                    }}
-                      title={`${w.week} · ${colTotal} complaints`}
+                return categoryTrend.map((w) => {
+                  const colTotal = w.total
+                  const barH = colTotal > 0 ? Math.max(2, (colTotal / max) * MAX_BAR_PX) : 0
+                  const weekStart = format(new Date(w.week), 'MMM d, yyyy')
+                  // Build a rich tooltip with per-category breakdown
+                  const breakdown = trendCategories
+                    .map((cat) => ({ cat, n: w.cats[cat] || 0 }))
+                    .filter((x) => x.n > 0)
+                    .sort((a, b) => b.n - a.n)
+                    .map((x) => `${x.cat}: ${x.n}`)
+                    .join(' · ')
+                  const colTip = colTotal === 0
+                    ? `Week of ${weekStart} — no complaints recorded.`
+                    : `Week of ${weekStart} — ${colTotal} complaint${colTotal === 1 ? '' : 's'}. Breakdown: ${breakdown}.`
+                  return (
+                    <div
+                      key={w.week}
+                      className="hover-row"
+                      title={colTip}
+                      style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '2px 0', borderRadius: 4, cursor: 'help' }}
                     >
-                      {trendCategories.map((cat, i) => {
-                        const n = w.cats[cat] || 0
-                        if (n === 0) return null
-                        const pct = (n / colTotal) * 100
-                        return (
-                          <div key={cat}
-                            style={{ height: pct + '%', background: TREND_CAT_COLORS[i % TREND_CAT_COLORS.length] }}
-                            title={`${cat}: ${n}`}
-                          />
-                        )
-                      })}
+                      <div style={{
+                        height: barH,
+                        width: '100%',
+                        maxWidth: 28,
+                        display: 'flex',
+                        flexDirection: 'column-reverse',
+                        borderRadius: 3,
+                        overflow: 'hidden',
+                        background: colTotal === 0 ? 'rgba(255,255,255,0.04)' : 'transparent',
+                      }}>
+                        {trendCategories.map((cat, i) => {
+                          const n = w.cats[cat] || 0
+                          if (n === 0) return null
+                          const segH = (n / colTotal) * barH
+                          const pct = ((n / colTotal) * 100).toFixed(0)
+                          return (
+                            <div key={cat}
+                              style={{ height: segH, background: TREND_CAT_COLORS[i % TREND_CAT_COLORS.length] }}
+                              title={`${weekStart} — ${cat}: ${n} (${pct}% of week)`}
+                            />
+                          )
+                        })}
+                      </div>
+                      <span className="mono" style={{ fontSize: 9, color: 'var(--fg-4)' }}>
+                        {format(new Date(w.week), 'MMM d')}
+                      </span>
+                      <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 700 }}>{colTotal}</span>
                     </div>
-                    <span className="mono" style={{ fontSize: 9, color: 'var(--fg-4)' }}>
-                      {format(new Date(w.week), 'MMM d')}
-                    </span>
-                    <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 700 }}>{colTotal}</span>
-                  </div>
-                )
-              })}
+                  )
+                })
+              })()}
             </div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
               {trendCategories.map((cat, i) => (
@@ -180,13 +217,21 @@ export default function ComplaintsClient({
             </div>
             {severityData.map((s) => {
               const pct = totalComplaints > 0 ? (s.count / totalComplaints) * 100 : 0
+              const sevDesc = s.name === 'high' ? 'sentiment ≤ −0.6 — needs immediate escalation' :
+                              s.name === 'medium' ? 'sentiment ≤ −0.3 — respond within 24h' :
+                              'minor / one-off — batch review weekly'
               return (
-                <div key={s.name} style={{ display: 'grid', gridTemplateColumns: '70px 1fr 56px', alignItems: 'center', gap: 8, padding: '8px 0' }}>
+                <div
+                  key={s.name}
+                  className="hover-row"
+                  title={`${s.name.toUpperCase()} severity: ${s.count} complaints (${pct.toFixed(1)}% of ${totalComplaints}). Definition: ${sevDesc}.`}
+                  style={{ display: 'grid', gridTemplateColumns: '70px 1fr 56px', alignItems: 'center', gap: 8, padding: '8px 6px', borderRadius: 4, cursor: 'help' }}
+                >
                   <span style={{ fontSize: 11, color: SEV_COLOR[s.name], fontWeight: 700, textTransform: 'uppercase' }}>
                     {s.name === 'high' ? '⚠ ' : ''}{s.name}
                   </span>
                   <div style={{ height: 10, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{ width: pct + '%', height: '100%', background: SEV_COLOR[s.name] }} />
+                    <div style={{ width: `max(${pct}%, ${s.count > 0 ? 6 : 0}px)`, height: '100%', background: SEV_COLOR[s.name] }} />
                   </div>
                   <span className="mono" style={{ fontSize: 11, textAlign: 'right', color: 'var(--fg-2)', fontWeight: 700 }}>
                     {s.count} · {pct.toFixed(0)}%
@@ -291,7 +336,7 @@ export default function ComplaintsClient({
                     <tr>
                       <th>#</th>
                       <th>USER</th>
-                      <th className="num sortable" onClick={() => repeatSort('complaints')}>COMPLAINTS<Tip text="Total number of flagged complaints from this user" />{repeatArrow('complaints')}</th>
+                      <th className="num sortable" onClick={() => repeatSort('complaints')}>COMPLAINTS<Tip text="Total number of flagged complaints from this user. Click a row to see the actual comments." />{repeatArrow('complaints')}</th>
                       <th>DOMINANT TOPIC<Tip text="The topic this user complains about most often" /></th>
                       <th className="num sortable" onClick={() => repeatSort('score')}>AMBASSADOR<Tip text="Ambassador score — a repeat complainer with a high score may just need attention, not to be written off" />{repeatArrow('score')}</th>
                       <th className="num sortable" onClick={() => repeatSort('sentiment')}>AVG SENT<Tip text="Average sentiment across all their comments — negative means they're consistently unhappy" />{repeatArrow('sentiment')}</th>
@@ -299,37 +344,99 @@ export default function ComplaintsClient({
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedRepeat.map((u, i) => (
-                      <tr key={u.username}>
-                        <td className="mono" style={{ fontSize: 11, color: 'var(--fg-4)' }}>
-                          {String(i + 1).padStart(2, '0')}
-                        </td>
-                        <td>
-                          <a href={`https://instagram.com/${u.username}`} target="_blank" rel="noopener noreferrer"
-                            className="tlink" style={{ fontWeight: 600 }}>
-                            @{u.username}
-                          </a>
-                        </td>
-                        <td className="cell-num">
-                          <span style={{ color: 'var(--red)', fontWeight: 700 }}>⚠ {u.complaint_count}</span>
-                        </td>
-                        <td>
-                          {u.dominant_topic ? (
-                            <span className="pill pill-ghost" style={{ textTransform: 'capitalize', fontSize: 10 }}>{u.dominant_topic}</span>
-                          ) : '—'}
-                        </td>
-                        <td className="cell-num">{(u.ambassador_score ?? 0).toFixed(1)}</td>
-                        <td className="cell-num" style={{
-                          color: (u.avg_sentiment_score ?? 0) >= 0 ? 'var(--joola)' : 'var(--red)',
-                          fontWeight: 600,
-                        }}>
-                          {(u.avg_sentiment_score ?? 0).toFixed(2)}
-                        </td>
-                        <td className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-                          {u.last_seen_at ? format(new Date(u.last_seen_at), 'MMM d') : '—'}
-                        </td>
-                      </tr>
-                    ))}
+                    {sortedRepeat.map((u, i) => {
+                      const userComplaints = complaintsByUser.get((u.username || '').toLowerCase()) ?? []
+                      const isOpen = expandedUser === u.username
+                      return (
+                        <Fragment key={u.username}>
+                          <tr
+                            onClick={() => setExpandedUser(isOpen ? null : u.username)}
+                            style={{ cursor: userComplaints.length > 0 ? 'pointer' : 'default' }}
+                            title={userComplaints.length > 0 ? 'Click to view this user\'s actual complaint comments' : 'No complaint comments indexed for this user.'}
+                          >
+                            <td className="mono" style={{ fontSize: 11, color: 'var(--fg-4)' }}>
+                              {userComplaints.length > 0 && (
+                                <span style={{ display: 'inline-block', width: 10, color: 'var(--yellow)', marginRight: 2 }}>
+                                  {isOpen ? '▾' : '▸'}
+                                </span>
+                              )}
+                              {String(i + 1).padStart(2, '0')}
+                            </td>
+                            <td>
+                              <a href={`https://instagram.com/${u.username}`} target="_blank" rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="tlink" style={{ fontWeight: 600 }}>
+                                @{u.username}
+                              </a>
+                            </td>
+                            <td className="cell-num">
+                              <span style={{ color: 'var(--red)', fontWeight: 700 }}>⚠ {u.complaint_count}</span>
+                            </td>
+                            <td>
+                              {u.dominant_topic ? (
+                                <span className="pill pill-ghost" style={{ textTransform: 'capitalize', fontSize: 10 }}>{u.dominant_topic}</span>
+                              ) : '—'}
+                            </td>
+                            <td className="cell-num">{(u.ambassador_score ?? 0).toFixed(1)}</td>
+                            <td className="cell-num" style={{
+                              color: (u.avg_sentiment_score ?? 0) >= 0 ? 'var(--joola)' : 'var(--red)',
+                              fontWeight: 600,
+                            }}>
+                              {(u.avg_sentiment_score ?? 0).toFixed(2)}
+                            </td>
+                            <td className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
+                              {u.last_seen_at ? format(new Date(u.last_seen_at), 'MMM d') : '—'}
+                            </td>
+                          </tr>
+                          {isOpen && (
+                            <tr>
+                              <td colSpan={7} style={{ background: 'rgba(214,24,42,0.04)', padding: '12px 18px', borderLeft: '3px solid var(--red)' }}>
+                                {userComplaints.length === 0 ? (
+                                  <div style={{ fontSize: 11.5, color: 'var(--fg-4)' }}>
+                                    Complaint counter is {u.complaint_count}, but no individual comment rows were indexed for this user.
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                    <div className="mono" style={{ fontSize: 10, color: 'var(--fg-4)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                      All complaints from @{u.username} ({userComplaints.length})
+                                    </div>
+                                    {userComplaints.map((c, idx) => {
+                                      const sev = (c.severity || 'low').toLowerCase()
+                                      return (
+                                        <div key={c.comment_id ?? idx} style={{ paddingBottom: 10, borderBottom: idx < userComplaints.length - 1 ? '1px solid var(--line-2)' : 'none' }}>
+                                          <div style={{ fontSize: 12.5, color: 'var(--fg-2)', fontStyle: 'italic', marginBottom: 6, lineHeight: 1.5 }}>
+                                            &ldquo;{c.complaint_text}&rdquo;
+                                          </div>
+                                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: 10 }}>
+                                            {c.complained_at && (
+                                              <span className="mono" style={{ color: 'var(--fg-4)' }}>
+                                                {format(new Date(c.complained_at), 'MMM d, yyyy')}
+                                              </span>
+                                            )}
+                                            <span className={'pill ' + (SEV_PILL[sev] ?? 'pill-ghost')}>
+                                              {sev === 'high' ? '⚠ ' : ''}{sev.toUpperCase()}
+                                            </span>
+                                            {c.complaint_category && <span className="pill pill-ghost">{c.complaint_category}</span>}
+                                            {c.joola_responded
+                                              ? <span className="pill pill-green">✓ RESPONDED</span>
+                                              : <span className="pill pill-amber">PENDING</span>}
+                                            {c.post_url && (
+                                              <a href={c.post_url} target="_blank" rel="noopener noreferrer" className="tlink" style={{ fontSize: 10 }}>
+                                                ↗ view post
+                                              </a>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      )
+                    })}
                   </tbody>
                 </table>
                 {repeatComplainers.length === 0 && <div className="empty">No repeat complainers — every flagged comment is from a different user.</div>}

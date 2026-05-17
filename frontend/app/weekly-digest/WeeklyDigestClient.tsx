@@ -149,8 +149,8 @@ export default function WeeklyDigestClient({
             sub="reels + video" delta={deltas?.views}
             tooltip="Combined view count across all Reels and video content published this week" />
           <StatCard label="Avg Engagement Rate" value={(current.avg_engagement_rate * 100).toFixed(2) + '%'}
-            sub="(likes + comments) / reach" delta={deltas?.er}
-            tooltip="Average percentage of your audience that actively engaged with posts this week — above 6% is excellent" />
+            sub="(likes + comments) ÷ reach" delta={deltas?.er}
+            tooltip="Engagement Rate = (likes + comments) ÷ people who saw the post. Example: post seen by 10,000 with 600 likes + 50 comments = 6.5%. Benchmarks: 6%+ excellent, 3–6% healthy, under 3% needs attention." />
         </div>
       </div>
 
@@ -266,7 +266,8 @@ export default function WeeklyDigestClient({
               <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                 {topPost.thumbnail_url && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={topPost.thumbnail_url} alt="" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--line)', flexShrink: 0 }} />
+                  <img src={topPost.thumbnail_url} alt="" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--line)', flexShrink: 0 }}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
                 )}
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, color: 'var(--fg-2)', marginBottom: 6, lineHeight: 1.4 }}>
@@ -316,22 +317,24 @@ export default function WeeklyDigestClient({
         <div className="card-grid cg-3">
           <div className="card card-pad-lg">
             <div className="card-head"><h3>★ TOP WISHLIST<Tip text="Most-requested products and features from fans across all time — your crowdsourced R&D backlog." /></h3><span className="meta">all-time, ranked</span></div>
-            {wishlist.length === 0 ? <div className="empty">No requests.</div> :
-              wishlist.map((w, i) => (
-                <div key={w.comment_id ?? i} style={{ padding: '8px 0', borderBottom: '1px solid var(--line-2)' }}>
-                  <div style={{ fontSize: 12, color: 'var(--fg-2)', lineHeight: 1.4 }}>
-                    &ldquo;{(w.wishlist_text || '').slice(0, 90)}{(w.wishlist_text?.length ?? 0) > 90 ? '…' : ''}&rdquo;
+            <div style={{ maxHeight: 280, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+              {wishlist.length === 0 ? <div className="empty">No requests.</div> :
+                wishlist.map((w, i) => (
+                  <div key={w.comment_id ?? i} style={{ padding: '8px 0', borderBottom: '1px solid var(--line-2)' }}>
+                    <div style={{ fontSize: 12, color: 'var(--fg-2)', lineHeight: 1.4 }}>
+                      &ldquo;{(w.wishlist_text || '').slice(0, 90)}{(w.wishlist_text?.length ?? 0) > 90 ? '…' : ''}&rdquo;
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 4, alignItems: 'center', fontSize: 10 }}>
+                      {w.category && <span className="pill pill-ghost" style={{ textTransform: 'capitalize', fontSize: 9 }}>{w.category}</span>}
+                      {w.times_similar_requested != null && w.times_similar_requested > 1 && (
+                        <span className="pill pill-yellow" style={{ fontSize: 9 }}>×{w.times_similar_requested}</span>
+                      )}
+                      <span className="mono" style={{ color: 'var(--fg-4)' }}>@{w.username}</span>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 4, alignItems: 'center', fontSize: 10 }}>
-                    {w.category && <span className="pill pill-ghost" style={{ textTransform: 'capitalize', fontSize: 9 }}>{w.category}</span>}
-                    {w.times_similar_requested != null && w.times_similar_requested > 1 && (
-                      <span className="pill pill-yellow" style={{ fontSize: 9 }}>×{w.times_similar_requested}</span>
-                    )}
-                    <span className="mono" style={{ color: 'var(--fg-4)' }}>@{w.username}</span>
-                  </div>
-                </div>
-              ))
-            }
+                ))
+              }
+            </div>
           </div>
 
           <div className="card card-pad-lg">

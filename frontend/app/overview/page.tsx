@@ -54,12 +54,24 @@ export default async function OverviewPage() {
       .returns<IgPost[]>(),
   ])
 
-  const snaps = weeklySnapshots ?? []
-  const postArr = posts as unknown as IgPost[] ?? []
+  // Normalize engagement_rate to fraction convention (see posts/page.tsx for rationale).
+  const normEr = <T extends { engagement_rate?: number | null }>(p: T): T => {
+    const er = p.engagement_rate
+    if (er == null || isNaN(er)) return p
+    return { ...p, engagement_rate: er > 1 ? er / 100 : er }
+  }
+  const normSnapEr = <T extends { avg_engagement_rate?: number | null }>(w: T): T => {
+    const er = w.avg_engagement_rate
+    if (er == null || isNaN(er)) return w
+    return { ...w, avg_engagement_rate: er > 1 ? er / 100 : er }
+  }
+
+  const snaps = (weeklySnapshots ?? []).map(normSnapEr)
+  const postArr = (posts as unknown as IgPost[] ?? []).map(normEr)
   const commentArr = commentAnalysis as unknown as Pick<IgCommentAnalysis, 'sentiment' | 'primary_topic'>[] ?? []
   const loyalArr = loyalUsers as unknown as IgLoyalUser[] ?? []
   const complaintArr = complaints as unknown as IgComplaintLog[] ?? []
-  const topPostArr = topPosts as unknown as IgPost[] ?? []
+  const topPostArr = (topPosts as unknown as IgPost[] ?? []).map(normEr)
 
   // KPIs
   const totalPosts = postArr.length

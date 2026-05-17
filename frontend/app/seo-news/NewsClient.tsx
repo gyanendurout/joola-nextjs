@@ -157,13 +157,29 @@ function ArticleCard({ article, onClick }: { article: NewsArticle; onClick: () =
     >
       {/* Top strip */}
       {article.image_url ? (
-        <div style={{ height: 130, overflow: 'hidden', background: 'var(--surface-2)' }}>
+        <div style={{ height: 130, overflow: 'hidden', background: 'var(--surface-2)', position: 'relative' }}>
           <img src={article.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            onError={(e) => {
+              const img = e.target as HTMLImageElement
+              const parent = img.parentElement
+              if (parent) {
+                parent.style.display = 'none'
+                // Reveal the sibling sentiment stripe so the card still has a top accent
+                const stripe = parent.nextElementSibling as HTMLElement | null
+                if (stripe && stripe.dataset.fallbackStripe === '1') stripe.style.display = 'block'
+              }
+            }} />
         </div>
-      ) : (
-        <div style={{ height: 5, background: `linear-gradient(90deg, ${SENTIMENT_COLOR[sent]}, transparent)` }} />
-      )}
+      ) : null}
+      {/* Fallback stripe (always present, only shown when image fails or is missing) */}
+      <div
+        data-fallback-stripe="1"
+        style={{
+          height: 5,
+          background: `linear-gradient(90deg, ${SENTIMENT_COLOR[sent]}, transparent)`,
+          display: article.image_url ? 'none' : 'block',
+        }}
+      />
 
       <div style={{ padding: '13px 15px 15px' }}>
         {/* Source + date + sentiment */}
@@ -244,7 +260,7 @@ function ArticleModal({ article, onClose }: { article: NewsArticle; onClose: () 
   const sent = article.sentiment || 'informative'
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div className="card" style={{ width: '100%', maxWidth: 700, padding: 0, position: 'relative' }}>
@@ -255,7 +271,7 @@ function ArticleModal({ article, onClose }: { article: NewsArticle; onClose: () 
           </div>
         )}
         <div style={{ padding: '24px 28px' }}>
-          <button onClick={onClose} style={{ position: 'absolute', top: 14, right: 16, background: 'none', border: 'none', color: 'var(--fg-4)', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
+          <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 16, background: 'none', border: 'none', color: 'var(--fg-4)', cursor: 'pointer', fontSize: 22, lineHeight: 1 }}>×</button>
 
           {/* Meta row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -451,8 +467,8 @@ function AnalyticsTab({ articles }: { articles: NewsArticle[] }) {
       {/* Player leaderboard */}
       <div className="card card-pad-lg" style={{ gridColumn: '1 / -1' }}>
         <div className="card-head" style={{ marginBottom: 16 }}>
-          <span>Player Media Visibility</span>
-          <span style={{ fontSize: 11, color: 'var(--fg-4)' }}>{playerStats.length} players mentioned</span>
+          <h3>PLAYER MEDIA VISIBILITY</h3>
+          <span className="meta">{playerStats.length} players mentioned</span>
         </div>
         {playerStats.length === 0 ? (
           <div className="empty">No player mentions in current filter window</div>
@@ -482,14 +498,14 @@ function AnalyticsTab({ articles }: { articles: NewsArticle[] }) {
 
       {/* Sentiment chart */}
       <div className="card card-pad-lg">
-        <div className="card-head" style={{ marginBottom: 14 }}><span>Sentiment Mix</span></div>
+        <div className="card-head" style={{ marginBottom: 14 }}><h3>SENTIMENT MIX</h3></div>
         {sentStats.length === 0 ? <div className="empty">No data</div> : (
           <div style={{ display: 'grid', gap: 10 }}>
             {sentStats.map(s => (
               <div key={s.sent} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', textTransform: 'uppercase', minWidth: 80, color: SENTIMENT_COLOR[s.sent] || 'var(--fg-4)' }}>{s.sent}</span>
-                <div style={{ flex: 1, height: 7, borderRadius: 3.5, background: 'var(--surface-2)', overflow: 'hidden' }}>
-                  <div style={{ width: `${s.pct}%`, height: '100%', background: SENTIMENT_COLOR[s.sent] || 'var(--fg-4)', borderRadius: 3.5 }} />
+                <div style={{ flex: 1, height: 7, borderRadius: 3.5, background: 'var(--surface-2)', overflow: 'hidden', position: 'relative' }}>
+                  <div style={{ width: `max(${s.pct}%, ${s.count > 0 ? 6 : 0}px)`, height: '100%', background: SENTIMENT_COLOR[s.sent] || 'var(--fg-4)', borderRadius: 3.5 }} />
                 </div>
                 <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: 'var(--fg-2)', minWidth: 46, textAlign: 'right' }}>{s.count} ({s.pct}%)</span>
               </div>
@@ -500,7 +516,7 @@ function AnalyticsTab({ articles }: { articles: NewsArticle[] }) {
 
       {/* Relevance breakdown */}
       <div className="card card-pad-lg">
-        <div className="card-head" style={{ marginBottom: 14 }}><span>Relevance Types</span></div>
+        <div className="card-head" style={{ marginBottom: 14 }}><h3>RELEVANCE TYPES</h3></div>
         {relevanceStats.length === 0 ? <div className="empty">No data</div> : (
           <div style={{ display: 'grid', gap: 10 }}>
             {relevanceStats.map(r => {
@@ -511,7 +527,7 @@ function AnalyticsTab({ articles }: { articles: NewsArticle[] }) {
                 <div key={r.type} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 10, color, minWidth: 160, lineHeight: 1.3 }}>{r.type}</span>
                   <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'var(--surface-2)', overflow: 'hidden' }}>
-                    <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3 }} />
+                    <div style={{ width: `max(${pct}%, ${r.count > 0 ? 6 : 0}px)`, height: '100%', background: color, borderRadius: 3 }} />
                   </div>
                   <span style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace', color: 'var(--fg-2)', minWidth: 28, textAlign: 'right' }}>{r.count}</span>
                 </div>
@@ -548,8 +564,8 @@ function SourcesTab({ articles }: { articles: NewsArticle[] }) {
   return (
     <div className="card card-pad-lg">
       <div className="card-head" style={{ marginBottom: 16 }}>
-        <span>Source Coverage</span>
-        <span style={{ fontSize: 11, color: 'var(--fg-4)' }}>{sourceStats.length} sources with articles</span>
+        <h3>SOURCE COVERAGE</h3>
+        <span className="meta">{sourceStats.length} sources with articles</span>
       </div>
       {sourceStats.length === 0 ? (
         <div className="empty">No source data</div>
@@ -605,6 +621,8 @@ function chip(on: boolean): React.CSSProperties {
 
 function sentChip(val: string, active: string): React.CSSProperties {
   const on = active === val
+  // 'all' has no sentiment color — use the standard yellow active state for consistency with other "All" chips.
+  if (val === 'all') return chip(on)
   const color = SENTIMENT_COLOR[val] || 'var(--fg-4)'
   return {
     display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 20,
@@ -646,6 +664,9 @@ export default function NewsClient({ articles: initialArticles, latestRun }: Pro
 
   // Article detail modal
   const [modalArticle, setModalArticle] = useState<NewsArticle | null>(null)
+
+  // Export feedback ('idle' | 'exporting' | 'done')
+  const [exportState, setExportState] = useState<'idle' | 'exporting' | 'done'>('idle')
 
   const allSources = useMemo(() => {
     const s = new Set(initialArticles.map(a => a.source_site).filter(Boolean))
@@ -714,56 +735,85 @@ export default function NewsClient({ articles: initialArticles, latestRun }: Pro
   const hasFilters = sentiment !== 'all' || mention !== 'all' || articleType !== 'all' || relevanceType !== 'all' || selectedAction !== 'all' || selectedPlayers.size > 0 || selectedSources.size > 0 || search
 
   return (
-    <div className="main-inner">
+    <div>
       {/* ----------------------------------------------------------------- */}
       {/* Header                                                              */}
       {/* ----------------------------------------------------------------- */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+      <header className="page-head">
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, letterSpacing: '-0.5px', color: 'var(--fg)' }}>In News</h1>
-          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--fg-4)' }}>
-            Pickleball media · JOOLA brand &amp; sponsored players
-            {latestRun?.finished_at && <> · scraped <b style={{ color: 'var(--fg-2)' }}>{timeSince(latestRun.finished_at)}</b></>}
-          </p>
+          <div className="eyebrow">
+            <span className="live-pulse-dot" />
+            SEO · PICKLEBALL MEDIA
+          </div>
+          <h1>IN <em>NEWS</em></h1>
+          <div className="sub">
+            JOOLA brand &amp; sponsored player coverage across pickleball media.
+            {latestRun?.finished_at && <> Scraped <b style={{ color: 'var(--fg-2)' }}>{timeSince(latestRun.finished_at)}</b>.</>}
+          </div>
         </div>
-        <button className="btn" style={{ fontSize: 11 }} onClick={() => exportCSV(filtered)} title="Export filtered articles as CSV">
-          ↓ Export
-        </button>
-      </div>
+        <div className="head-actions">
+          <button
+            className="btn"
+            style={{
+              fontSize: 11,
+              opacity: exportState === 'exporting' ? 0.7 : 1,
+              color: exportState === 'done' ? 'var(--joola)' : undefined,
+              borderColor: exportState === 'done' ? 'rgba(34,197,94,0.4)' : undefined,
+            }}
+            disabled={exportState === 'exporting' || filtered.length === 0}
+            onClick={() => {
+              if (exportState === 'exporting' || filtered.length === 0) return
+              setExportState('exporting')
+              try {
+                exportCSV(filtered)
+                setExportState('done')
+                setTimeout(() => setExportState('idle'), 2200)
+              } catch {
+                setExportState('idle')
+              }
+            }}
+            title={filtered.length === 0 ? 'No articles to export' : `Export ${filtered.length} filtered articles as CSV`}
+          >
+            {exportState === 'exporting' ? '⏳ Exporting…' :
+             exportState === 'done'      ? `✓ Exported ${filtered.length}` :
+                                           `↓ Export (${filtered.length})`}
+          </button>
+        </div>
+      </header>
 
       {/* ----------------------------------------------------------------- */}
       {/* KPI row                                                             */}
       {/* ----------------------------------------------------------------- */}
-      <div className="kpi-grid" style={{ marginBottom: 18 }}>
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 18 }}>
         <div className="kpi">
           <div className="label">Total Articles</div>
-          <div className="value">{stats.total.toLocaleString()}</div>
-          <div className="meta">last {days === 180 ? '6 months' : `${days}d`}</div>
+          <div className="row"><span className="value">{stats.total.toLocaleString()}</span></div>
+          <div className="src">last {days === 180 ? '6 months' : `${days}d`}</div>
         </div>
         <div className="kpi joola">
           <div className="label">JOOLA Mentions</div>
-          <div className="value">{stats.joola}</div>
-          <div className="meta">brand name found</div>
+          <div className="row"><span className="value">{stats.joola}</span></div>
+          <div className="src">brand name found</div>
         </div>
         <div className="kpi">
           <div className="label">Player Mentions</div>
-          <div className="value">{stats.player}</div>
-          <div className="meta">sponsored athletes</div>
+          <div className="row"><span className="value">{stats.player}</span></div>
+          <div className="src">sponsored athletes</div>
         </div>
         <div className="kpi">
           <div className="label">Positive Coverage</div>
-          <div className="value">{stats.positive}</div>
-          <div className="meta" style={{ color: 'var(--joola)' }}>good news</div>
+          <div className="row"><span className="value">{stats.positive}</span></div>
+          <div className="src" style={{ color: 'var(--joola)' }}>good news</div>
         </div>
-        <div className="kpi" style={stats.negative > 0 ? { borderColor: 'rgba(239,68,68,0.25)' } : undefined}>
+        <div className="kpi danger" style={stats.negative > 0 ? { borderColor: 'rgba(239,68,68,0.25)' } : undefined}>
           <div className="label">Negative / Risk</div>
-          <div className="value" style={{ color: stats.negative > 0 ? 'var(--down)' : undefined }}>{stats.negative}</div>
-          <div className="meta">needs attention</div>
+          <div className="row"><span className="value" style={{ color: stats.negative > 0 ? 'var(--down)' : undefined }}>{stats.negative}</span></div>
+          <div className="src">needs attention</div>
         </div>
         <div className="kpi">
           <div className="label">Competitor Mentions</div>
-          <div className="value">{stats.competitor}</div>
-          <div className="meta">competitive intel</div>
+          <div className="row"><span className="value">{stats.competitor}</span></div>
+          <div className="src">competitive intel</div>
         </div>
       </div>
 
@@ -783,7 +833,7 @@ export default function NewsClient({ articles: initialArticles, latestRun }: Pro
       {/* Insight banner (articles tab only)                                  */}
       {/* ----------------------------------------------------------------- */}
       {tab === 'articles' && initialArticles.length > 0 && (
-        <InsightBanner articles={initialArticles.filter(a => a.published_at && new Date(a.published_at) >= cutoff)} days={days} />
+        <InsightBanner articles={filtered} days={days} />
       )}
 
       {/* ================================================================= */}
@@ -796,9 +846,9 @@ export default function NewsClient({ articles: initialArticles, latestRun }: Pro
             {/* Period + sort */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 10, color: 'var(--fg-4)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'JetBrains Mono, monospace', minWidth: 64 }}>Period</span>
-              {[30, 60, 90, 180].map(d => (
+              {[90, 120, 150, 180].map(d => (
                 <span key={d} style={chip(days === d)} onClick={() => setDays(d)}>
-                  {d === 180 ? '6mo' : `${d}d`}
+                  {d === 180 ? '6M' : `${d}D`}
                 </span>
               ))}
               <span style={{ flex: 1 }} />

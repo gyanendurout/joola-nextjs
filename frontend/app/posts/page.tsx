@@ -49,7 +49,19 @@ export default async function PostsPage() {
       .returns<Pick<IgWeeklySnapshot, 'posts_published' | 'total_views' | 'avg_engagement_rate'>>(),
   ])
 
-  const postArr = posts ?? []
+  const rawPosts = posts ?? []
+  // ─── Normalize engagement_rate ──────────────────────────────────────────
+  // The DB stores `engagement_rate` inconsistently — some rows use fraction (0.06 = 6%),
+  // others store percentage (6.0 = 6%, 89.84 = 89.84%). Without normalization the UI
+  // multiplies by 100 and renders 600% / 8984%. Convention everywhere downstream:
+  // engagement_rate is a fraction in [0, 1]. Any DB value > 1 is treated as already
+  // a percentage and divided by 100. Also normalize the weekly snapshot below.
+  const postArr = rawPosts.map((p) => {
+    const er = p.engagement_rate
+    if (er == null || isNaN(er)) return p
+    return { ...p, engagement_rate: er > 1 ? er / 100 : er }
+  })
+
   const analysisMap = new Map((analysis ?? []).map((a) => [a.post_id, a]))
 
   // Merge analysis into posts
@@ -66,7 +78,13 @@ export default async function PostsPage() {
     ? postArr.reduce((a, p) => a + (p.engagement_rate || 0), 0) / totalPosts
     : 0
 
-  const snaps = weeklySnapshots as unknown as Pick<IgWeeklySnapshot, 'posts_published' | 'total_views' | 'avg_engagement_rate'>[] ?? []
+  const rawSnaps = weeklySnapshots as unknown as Pick<IgWeeklySnapshot, 'posts_published' | 'total_views' | 'avg_engagement_rate'>[] ?? []
+  // Apply the same ER normalization to weekly snapshots (fraction convention).
+  const snaps = rawSnaps.map((w) => {
+    const er = w.avg_engagement_rate
+    if (er == null || isNaN(er)) return w
+    return { ...w, avg_engagement_rate: er > 1 ? er / 100 : er }
+  })
   function pad13(arr: number[]) { const a = [...arr]; while (a.length < 13) a.unshift(0); return a.slice(-13) }
   const postsTrend = pad13(snaps.map((w) => w.posts_published ?? 0))
   const erTrend = pad13(snaps.map((w) => +(((w.avg_engagement_rate ?? 0) * 100)).toFixed(2)))

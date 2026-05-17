@@ -106,23 +106,32 @@ function ScoreTag({ score }: { score: number | undefined | null }) {
 }
 
 function HBar({
-  data, colorOf, max,
+  data, colorOf, max, tipPrefix,
 }: {
   data: Array<{ name: string; value: number }>
   colorOf?: (name: string) => string
   max?: number
+  tipPrefix?: string
 }) {
   const cap = max ?? Math.max(1, ...data.map((d) => d.value))
+  const total = data.reduce((s, d) => s + d.value, 0)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {data.map((d) => {
         const pct = (d.value / cap) * 100
+        const sharePct = total > 0 ? ((d.value / total) * 100).toFixed(1) : '0.0'
         const c = colorOf ? colorOf(d.name) : 'var(--yellow)'
+        const tip = `${tipPrefix ? tipPrefix + ' — ' : ''}${d.name}: ${d.value.toLocaleString()} (${sharePct}% of total).`
         return (
-          <div key={d.name} style={{ display: 'grid', gridTemplateColumns: '88px 1fr 44px', alignItems: 'center', gap: 8 }}>
+          <div
+            key={d.name}
+            className="hover-row"
+            title={tip}
+            style={{ display: 'grid', gridTemplateColumns: '88px 1fr 44px', alignItems: 'center', gap: 8, padding: '2px 4px', borderRadius: 4, cursor: 'help' }}
+          >
             <span style={{ fontSize: 11, color: 'var(--fg-3)', textTransform: 'capitalize' }}>{d.name}</span>
             <div style={{ height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}>
-              <div style={{ width: pct + '%', height: '100%', background: c, transition: 'width 200ms ease' }} />
+              <div style={{ width: `max(${pct}%, ${d.value > 0 ? 4 : 0}px)`, height: '100%', background: c, transition: 'width 200ms ease' }} />
             </div>
             <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', textAlign: 'right' }}>{d.value.toLocaleString()}</span>
           </div>
@@ -208,6 +217,22 @@ export default function CommentsClient({
     )
   }, [wishlist, search, tab])
 
+  const matchVirality = (v: ViralityRow, q: string) =>
+    !q ||
+    (v.caption || '').toLowerCase().includes(q) ||
+    (v.post_id || '').toLowerCase().includes(q) ||
+    (v.post_type || '').toLowerCase().includes(q)
+
+  const filteredFast = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    return viralityFast.filter((v) => matchVirality(v, q))
+  }, [viralityFast, search])
+
+  const filteredSlow = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    return viralitySlow.filter((v) => matchVirality(v, q))
+  }, [viralitySlow, search])
+
   const totalSentiment = sentimentData.reduce((s, d) => s + d.value, 0) || 1
   const sentimentSlices: DonutSlice[] = sentimentData.map((d) => ({
     name: d.name,
@@ -281,28 +306,39 @@ export default function CommentsClient({
               <h3>⚡ FAST STARTS<Tip text="Posts that got a big burst of comments in the first hour after publishing — a strong viral signal that means the algorithm gave them a boost." /></h3>
               <span className="meta">most comments in first hour · all-time</span>
             </div>
-            {viralityFast.length === 0 ? (
-              <div className="empty" style={{ fontSize: 11 }}>No fast-start posts yet (need ≥3 comments in first hour).</div>
+            {filteredFast.length === 0 ? (
+              <div className="empty" style={{ fontSize: 11 }}>
+                {search ? 'No fast-start posts match your search.' : 'No fast-start posts yet (need ≥3 comments in first hour).'}
+              </div>
             ) : (
-              viralityFast.map((v) => (
-                <div key={v.post_id} style={{ padding: '8px 0', borderBottom: '1px solid var(--line-2)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-                    <div style={{ fontSize: 12, color: 'var(--fg-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                      {v.caption || v.post_id}
+              filteredFast.map((v) => {
+                const firstHourPct = Math.round(v.first_hour_pct * 100)
+                const tip = `${v.post_type?.toUpperCase() || 'POST'} from ${format(new Date(v.posted_at), 'MMM d, yyyy')}. ${v.first_hour} comments in the first hour (${firstHourPct}% of total). ${v.first_24h} comments within 24 hours. ${v.total_comments} comments total. The algorithm typically boosts posts that spike early — replicate the format, hook, or timing of these.`
+                return (
+                  <div
+                    key={v.post_id}
+                    className="hover-row"
+                    title={tip}
+                    style={{ padding: '8px 6px', borderBottom: '1px solid var(--line-2)', borderRadius: 4, cursor: 'help' }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                      <div style={{ fontSize: 12, color: 'var(--fg-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                        {v.caption || v.post_id}
+                      </div>
+                      <span className="mono" style={{ fontSize: 11, color: 'var(--yellow)', fontWeight: 700 }}>
+                        {firstHourPct}% in 1h
+                      </span>
                     </div>
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--yellow)', fontWeight: 700 }}>
-                      {Math.round(v.first_hour_pct * 100)}% in 1h
-                    </span>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 10.5, color: 'var(--fg-4)' }}>
+                      <span className="mono">{v.first_hour}/1h</span>
+                      <span className="mono">{v.first_24h}/24h</span>
+                      <span className="mono">{v.total_comments} total</span>
+                      <span className="pill pill-ghost" style={{ fontSize: 9, textTransform: 'uppercase' }}>{v.post_type}</span>
+                      {v.post_url && <a href={v.post_url} target="_blank" rel="noopener noreferrer" className="tlink" style={{ fontSize: 10 }} onClick={(e) => e.stopPropagation()}>↗</a>}
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 10.5, color: 'var(--fg-4)' }}>
-                    <span className="mono">{v.first_hour}/1h</span>
-                    <span className="mono">{v.first_24h}/24h</span>
-                    <span className="mono">{v.total_comments} total</span>
-                    <span className="pill pill-ghost" style={{ fontSize: 9, textTransform: 'uppercase' }}>{v.post_type}</span>
-                    {v.post_url && <a href={v.post_url} target="_blank" rel="noopener noreferrer" className="tlink" style={{ fontSize: 10 }}>↗</a>}
-                  </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
           <div className="card card-pad-lg">
@@ -310,27 +346,38 @@ export default function CommentsClient({
               <h3>🐢 SLOW BURNS<Tip text="Posts that kept accumulating comments over days rather than spiking early — content with lasting appeal that keeps surfacing in feeds." /></h3>
               <span className="meta">sustained engagement · all-time</span>
             </div>
-            {viralitySlow.length === 0 ? (
-              <div className="empty" style={{ fontSize: 11 }}>No slow-burn posts yet (need ≥15 comments and &lt;15% in first hour).</div>
+            {filteredSlow.length === 0 ? (
+              <div className="empty" style={{ fontSize: 11 }}>
+                {search ? 'No slow-burn posts match your search.' : 'No slow-burn posts yet (need ≥15 comments and <15% in first hour).'}
+              </div>
             ) : (
-              viralitySlow.map((v) => (
-                <div key={v.post_id} style={{ padding: '8px 0', borderBottom: '1px solid var(--line-2)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-                    <div style={{ fontSize: 12, color: 'var(--fg-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                      {v.caption || v.post_id}
+              filteredSlow.map((v) => {
+                const firstHourPct = Math.round(v.first_hour_pct * 100)
+                const tip = `${v.post_type?.toUpperCase() || 'POST'} from ${format(new Date(v.posted_at), 'MMM d, yyyy')}. Slow-burn pattern: only ${v.first_hour} comments in the first hour (${firstHourPct}%) but ${v.total_comments} total over time. The Instagram algorithm kept resurfacing this post — its appeal compounds rather than spikes. Evergreen content like this is gold.`
+                return (
+                  <div
+                    key={v.post_id}
+                    className="hover-row"
+                    title={tip}
+                    style={{ padding: '8px 6px', borderBottom: '1px solid var(--line-2)', borderRadius: 4, cursor: 'help' }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                      <div style={{ fontSize: 12, color: 'var(--fg-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                        {v.caption || v.post_id}
+                      </div>
+                      <span className="mono" style={{ fontSize: 11, color: 'var(--joola)', fontWeight: 700 }}>
+                        {v.total_comments} comments
+                      </span>
                     </div>
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--joola)', fontWeight: 700 }}>
-                      {v.total_comments} comments
-                    </span>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 10.5, color: 'var(--fg-4)' }}>
+                      <span className="mono">{v.first_hour}/1h ({firstHourPct}%)</span>
+                      <span className="mono">{v.first_24h}/24h</span>
+                      <span className="pill pill-ghost" style={{ fontSize: 9, textTransform: 'uppercase' }}>{v.post_type}</span>
+                      {v.post_url && <a href={v.post_url} target="_blank" rel="noopener noreferrer" className="tlink" style={{ fontSize: 10 }} onClick={(e) => e.stopPropagation()}>↗</a>}
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 10.5, color: 'var(--fg-4)' }}>
-                    <span className="mono">{v.first_hour}/1h ({Math.round(v.first_hour_pct * 100)}%)</span>
-                    <span className="mono">{v.first_24h}/24h</span>
-                    <span className="pill pill-ghost" style={{ fontSize: 9, textTransform: 'uppercase' }}>{v.post_type}</span>
-                    {v.post_url && <a href={v.post_url} target="_blank" rel="noopener noreferrer" className="tlink" style={{ fontSize: 10 }}>↗</a>}
-                  </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </div>
@@ -357,8 +404,9 @@ export default function CommentsClient({
               </span>
             </div>
 
-            {/* Tabs */}
-            <div className="tabs" style={{ marginBottom: 12, flexWrap: 'wrap' }}>
+            {/* Unified filter strip — type tabs + sentiment + competitor (when relevant) in one row */}
+            <div className="tabs" style={{ marginBottom: 14, flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+              {/* Type tabs */}
               <button className={'tab ' + (tab === 'all' ? 'on' : '')} onClick={() => setTab('all')}>
                 All ({totalComments.toLocaleString()})
               </button>
@@ -377,40 +425,48 @@ export default function CommentsClient({
               <button className={'tab ' + (tab === 'wishlist' ? 'on' : '')} onClick={() => setTab('wishlist')}>
                 Wishlist ({wishlistCount})
               </button>
-            </div>
 
-            {/* Competitor chips (only in competitors tab) */}
-            {tab === 'competitors' && competitorData.length > 0 && (
-              <div className="chip-row" style={{ marginBottom: 12 }}>
-                <button
-                  className={'chip ' + (competitorFilter === '' ? 'on' : '')}
-                  onClick={() => setCompetitorFilter('')}
-                >
-                  All ({competitorMentionsCount})
-                </button>
-                {competitorData.slice(0, 8).map((c) => (
+              {/* Sentiment filter — appended to same row, with subtle divider (hidden on wishlist) */}
+              {tab !== 'wishlist' && (
+                <>
+                  <span style={{ width: 1, alignSelf: 'stretch', background: 'var(--line)', margin: '0 4px' }} aria-hidden="true" />
+                  <span style={{ fontSize: 10, color: 'var(--fg-4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'JetBrains Mono, monospace', alignSelf: 'center' }}>
+                    Sentiment
+                  </span>
+                  {(['all', 'positive', 'neutral', 'negative'] as FilterType[]).map((f) => (
+                    <button key={f} className={'chip ' + (filter === f ? 'on' : '')} onClick={() => setFilter(f)}>
+                      {f === 'all' ? 'Any' : f.charAt(0).toUpperCase() + f.slice(1)}
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {/* Competitor brand chips — only on competitors tab */}
+              {tab === 'competitors' && competitorData.length > 0 && (
+                <>
+                  <span style={{ width: 1, alignSelf: 'stretch', background: 'var(--line)', margin: '0 4px' }} aria-hidden="true" />
+                  <span style={{ fontSize: 10, color: 'var(--fg-4)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'JetBrains Mono, monospace', alignSelf: 'center' }}>
+                    Brand
+                  </span>
                   <button
-                    key={c.name}
-                    className={'chip ' + (competitorFilter === c.name ? 'on' : '')}
-                    onClick={() => setCompetitorFilter(c.name)}
-                    style={{ textTransform: 'capitalize' }}
+                    className={'chip ' + (competitorFilter === '' ? 'on' : '')}
+                    onClick={() => setCompetitorFilter('')}
                   >
-                    {c.name} ({c.count})
+                    Any ({competitorMentionsCount})
                   </button>
-                ))}
-              </div>
-            )}
-
-            {/* Sentiment chips (hide on wishlist tab) */}
-            {tab !== 'wishlist' && (
-              <div className="chip-row" style={{ marginBottom: 14 }}>
-                {(['all', 'positive', 'neutral', 'negative'] as FilterType[]).map((f) => (
-                  <button key={f} className={'chip ' + (filter === f ? 'on' : '')} onClick={() => setFilter(f)}>
-                    {f.charAt(0).toUpperCase() + f.slice(1)}
-                  </button>
-                ))}
-              </div>
-            )}
+                  {competitorData.slice(0, 8).map((c) => (
+                    <button
+                      key={c.name}
+                      className={'chip ' + (competitorFilter === c.name ? 'on' : '')}
+                      onClick={() => setCompetitorFilter(c.name)}
+                      style={{ textTransform: 'capitalize' }}
+                    >
+                      {c.name} ({c.count})
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
 
             {/* Wishlist rows */}
             {tab === 'wishlist' ? (
@@ -515,7 +571,7 @@ export default function CommentsClient({
                   <h3>BY CATEGORY<Tip text="Which product or feature categories fans request most — use this to prioritize your roadmap and product development." /></h3>
                   <span className="meta">{wishlistCount} requests · all-time</span>
                 </div>
-                <HBar data={wishlistCategoryData} colorOf={() => 'var(--yellow)'} />
+                <HBar data={wishlistCategoryData} colorOf={() => 'var(--yellow)'} tipPrefix="Wishlist requests" />
               </div>
             ) : (
               <div className="card card-pad-lg" style={{ marginBottom: 14 }}>
@@ -535,7 +591,7 @@ export default function CommentsClient({
                 <h3>EMOTION BREAKDOWN<Tip text="The specific emotions your audience expresses most — Joy and Excited = great content, Anger and Disgust = something needs fixing." /></h3>
                 <span className="meta">top {emotionData.length} · all-time</span>
               </div>
-              <HBar data={emotionData} colorOf={emotionColorOf} />
+              <HBar data={emotionData} colorOf={emotionColorOf} tipPrefix="Emotion in comments" />
             </div>
 
             <div className="card card-pad-lg">

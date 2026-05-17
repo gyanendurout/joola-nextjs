@@ -144,8 +144,8 @@ export default function OverviewClient({ data }: { data: OverviewData }) {
                 delta={'▲ ' + formatPct(18.2, true)} dir="up" />
               <KpiCard
                 variant={data.avgEngagement < 0.03 ? 'warn' : 'joola'}
-                label="ENGAGEMENT RATE" src="(likes+comments)/reach"
-                tooltip="Average percentage of your audience that liked or commented — above 6% is excellent, below 3% needs attention"
+                label="ENGAGEMENT RATE" src="(likes + comments) ÷ reach"
+                tooltip="Engagement Rate = (likes + comments) ÷ people who saw the post. Example: a post seen by 10,000 people that got 600 likes + 50 comments = 6.5%. Benchmarks: 6%+ excellent, 3–6% healthy, under 3% needs attention."
                 value={+(data.avgEngagement * 100).toFixed(2)} unit="%"
                 trend={data.trends.engagement}
                 delta={'▼ ' + formatPct(-2.4, true)} dir="down" />
@@ -187,7 +187,7 @@ export default function OverviewClient({ data }: { data: OverviewData }) {
                 value={data.avgResponseTimeMins ?? '—'}
                 unit={data.avgResponseTimeMins != null ? ' min' : ''}
                 trend={data.trends.responseTime}
-                delta={data.avgResponseTimeMins == null ? 'awaiting first reply' : 'min · 13-wk avg'}
+                delta={data.avgResponseTimeMins == null ? 'no replies yet' : 'min · 13-wk avg'}
                 dir={data.avgResponseTimeMins == null || data.avgResponseTimeMins > 60 ? 'down' : 'up'} />
             </div>
           </div>
@@ -218,10 +218,24 @@ export default function OverviewClient({ data }: { data: OverviewData }) {
                 <h3>POST TYPE MIX<Tip text="Split of Reels vs Photos vs Carousels in the last 13 weeks — the Instagram algorithm currently favors Reels for reach." /></h3>
                 <span className="meta">last 13 wk · n={data.postTypes.reduce((s, t) => s + (t.n ?? 0), 0)}</span>
               </div>
-              <div className="donut-wrap">
-                <Donut data={data.postTypes} size={150} thickness={22} />
-                <DonutLegend data={data.postTypes} />
-              </div>
+              {data.postTypes.length === 0 ? (
+                <div className="empty">No post type data yet.</div>
+              ) : (
+                <div className="donut-wrap" style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Donut data={data.postTypes} size={150} thickness={22} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 140 }}>
+                    {data.postTypes.map((d) => (
+                      <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 10, height: 10, background: d.color, borderRadius: 2, flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, color: 'var(--fg-2)', flex: 1 }}>{d.name}</span>
+                        <span className="mono" style={{ fontSize: 11, color: 'var(--fg-4)' }}>
+                          {(d.n ?? 0).toLocaleString()} · {d.pct.toFixed(1)}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {data.postTypes.length > 0 && (
                 <>
                   <div className="divider" />
@@ -245,33 +259,43 @@ export default function OverviewClient({ data }: { data: OverviewData }) {
                 <h3>CONTENT THEME MOMENTUM<Tip text="The dominant content theme for each week — shows whether you're staying consistent or jumping between topics. Consistent themes build stronger audience expectations." /></h3>
                 <span className="meta">dominant theme per week · last {data.themeMomentum.length} wk</span>
               </div>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'stretch', overflowX: 'auto' }}>
-                {data.themeMomentum.length === 0 && <div className="empty">No weekly theme data yet.</div>}
-                {data.themeMomentum.map((w) => {
-                  const t = (w.theme || 'general').toLowerCase()
-                  const color = themeColor[t] ?? 'var(--fg-4)'
-                  return (
-                    <div key={w.week} style={{ flex: 1, minWidth: 70, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                      <div style={{
-                        width: '100%', height: 36, borderRadius: 4,
-                        background: color, opacity: w.theme ? 0.85 : 0.2,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 9.5, fontWeight: 700, letterSpacing: '0.04em',
-                        color: '#0a0d12', textTransform: 'uppercase', textAlign: 'center',
-                        padding: '0 4px',
-                      }}
-                        title={`${w.week}: ${w.theme || 'unknown'} (${w.posts} posts)`}
-                      >
-                        {w.theme ? t.replace(/_/g, ' ').slice(0, 14) : '—'}
+              {data.themeMomentum.length === 0 || data.themeMomentum.every((w) => !w.theme) ? (
+                <div className="empty" style={{ textAlign: 'left' }}>
+                  No content-theme data yet. Run the post-analysis pipeline to populate
+                  <code className="mono" style={{ color: 'var(--fg-3)', padding: '0 4px' }}>joola_ig_weekly_snapshot.dominant_content_theme</code>
+                  to see this strip.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'stretch', overflowX: 'auto' }}>
+                  {data.themeMomentum.map((w) => {
+                    const t = (w.theme || '').toLowerCase()
+                    const known = !!w.theme && t in themeColor
+                    const color = known ? themeColor[t] : 'rgba(255,255,255,0.06)'
+                    return (
+                      <div key={w.week} style={{ flex: 1, minWidth: 70, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                        <div style={{
+                          width: '100%', height: 36, borderRadius: 4,
+                          background: color, opacity: w.theme ? 0.9 : 1,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 9.5, fontWeight: 700, letterSpacing: '0.04em',
+                          color: w.theme ? '#0a0d12' : 'var(--fg-4)',
+                          textTransform: 'uppercase', textAlign: 'center',
+                          padding: '0 4px',
+                          border: w.theme ? 'none' : '1px dashed var(--line)',
+                        }}
+                          title={`${w.week}: ${w.theme || 'no theme tagged'} (${w.posts} posts)`}
+                        >
+                          {w.theme ? t.replace(/_/g, ' ').slice(0, 14) : 'no data'}
+                        </div>
+                        <span className="mono" style={{ fontSize: 9, color: 'var(--fg-4)' }}>
+                          {w.week.slice(5)}
+                        </span>
+                        <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 700 }}>{w.posts}p</span>
                       </div>
-                      <span className="mono" style={{ fontSize: 9, color: 'var(--fg-4)' }}>
-                        {w.week.slice(5)}
-                      </span>
-                      <span className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', fontWeight: 700 }}>{w.posts}p</span>
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
                 {Object.entries(themeColor).map(([t, c]) => (
                   <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--fg-4)' }}>
@@ -309,26 +333,30 @@ export default function OverviewClient({ data }: { data: OverviewData }) {
                 <span className="meta">↑ by engagement rate · last 90 days</span>
               </div>
               <div>
-                {data.topPosts.slice(0, 5).map((p, i) => (
-                  <div className="mover-row" key={p.post_id}>
-                    <span className="rank">{String(i + 1).padStart(2, '0')}</span>
-                    <div className="brand-col" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span className="brand-dot" style={{ background: i === 0 ? 'var(--yellow)' : 'var(--fg-4)' }} />
-                      <span className="name" style={{ fontSize: 12 }}>
-                        {p.caption ? p.caption.slice(0, 42) + (p.caption.length > 42 ? '…' : '') : p.post_id}
+                {data.topPosts.slice(0, 5).map((p, i) => {
+                  // p.er is stored as a fraction (0–1). Convert to percentage for display.
+                  const erPct = p.er * 100
+                  return (
+                    <div className="mover-row" key={p.post_id}>
+                      <span className="rank">{String(i + 1).padStart(2, '0')}</span>
+                      <div className="brand-col" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="brand-dot" style={{ background: i === 0 ? 'var(--yellow)' : 'var(--fg-4)' }} />
+                        <span className="name" style={{ fontSize: 12 }}>
+                          {p.caption ? p.caption.slice(0, 42) + (p.caption.length > 42 ? '…' : '') : p.post_id}
+                        </span>
+                      </div>
+                      <span className="metric" style={{ fontSize: 11 }}>
+                        <span className={'pill ' + (postTypePillColor[p.post_type] ?? 'pill-ghost')}>
+                          {p.post_type}
+                        </span>
                       </span>
+                      <span className="val mono" style={{ color: erPct >= 6 ? 'var(--joola)' : erPct >= 3 ? 'var(--yellow)' : 'var(--fg-3)', fontWeight: 700 }}>
+                        {erPct.toFixed(1)}%
+                      </span>
+                      <span className="delta up">▲ ER</span>
                     </div>
-                    <span className="metric" style={{ fontSize: 11 }}>
-                      <span className={'pill ' + (postTypePillColor[p.post_type] ?? 'pill-ghost')}>
-                        {p.post_type}
-                      </span>
-                    </span>
-                    <span className="val mono" style={{ color: p.er >= 6 ? 'var(--joola)' : p.er >= 3 ? 'var(--yellow)' : 'var(--fg-3)', fontWeight: 700 }}>
-                      {p.er.toFixed(1)}%
-                    </span>
-                    <span className="delta up">▲ ER</span>
-                  </div>
-                ))}
+                  )
+                })}
                 {data.topPosts.length === 0 && (
                   <div className="empty">No posts yet — sync your Instagram data.</div>
                 )}

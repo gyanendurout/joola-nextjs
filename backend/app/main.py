@@ -49,6 +49,17 @@ def create_app() -> FastAPI:
     async def health() -> dict:
         return {"ok": True, "version": __version__, "env": settings.app_env}
 
+    @app.get("/api/sources/status")
+    async def sources_status() -> dict:
+        return {
+            "dataforseo":    bool(settings.dataforseo_login and settings.dataforseo_password),
+            "openai":        bool(settings.openai_api_key),
+            "apify":         bool(settings.apify_token),
+            "apify_enabled": settings.apify_enabled,
+            "google":        bool(settings.google_client_id and settings.google_client_secret),
+            "supabase":      bool(settings.supabase_url and settings.supabase_service_role_key),
+        }
+
     app.include_router(analyze_router)
     app.include_router(content_router)
     app.include_router(news_router)

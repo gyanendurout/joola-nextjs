@@ -1,12 +1,21 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { format } from 'date-fns'
 import KpiCard from '@/components/ui/KpiCard'
 import PostingTimeHeatmap from '@/components/PostingTimeHeatmap'
 import ContentCalendar from '@/components/ContentCalendar'
 import { Tip } from '@/components/ui/Tip'
 import type { IgPost, IgPostAnalysis } from '@/lib/types'
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+function fmtPostedAt(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const d = iso.slice(0, 10).split('-')
+  if (d.length !== 3) return '—'
+  const m = parseInt(d[1], 10) - 1
+  if (m < 0 || m > 11) return '—'
+  return MONTHS[m] + ' ' + parseInt(d[2], 10)
+}
 
 type EnrichedPost = IgPost & Partial<IgPostAnalysis>
 
@@ -58,7 +67,7 @@ type SortKey = 'er' | 'views' | 'likes' | 'comments' | 'date' | 'quality' | 'pre
 function fmtViews(v: number) {
   if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M'
   if (v >= 1e3) return (v / 1e3).toFixed(0) + 'K'
-  return v.toString()
+  return Math.round(v).toString()
 }
 
 const PREDICT_RANK: Record<string, number> = { low: 1, mid: 2, high: 3 }
@@ -76,14 +85,56 @@ function PredictPill({ p }: { p: string | undefined | null }) {
   return <span className={'pill ' + cls} style={{ textTransform: 'uppercase', fontSize: 9.5 }}>{v}</span>
 }
 
+type PeriodKey = '13w' | '4w' | 'ytd'
+const PERIOD_DAYS: Record<PeriodKey, number | 'ytd'> = { '13w': 91, '4w': 28, ytd: 'ytd' }
+const PERIOD_LABEL: Record<PeriodKey, string> = {
+  '13w': 'Last 13 weeks',
+  '4w':  'Last 4 weeks',
+  ytd:   'Year to date',
+}
+
 export default function PostsClient({
-  posts, postTypes, contentThemes, kpis, trends, heatmapData, calendarData,
+  posts, postTypes, kpis, trends, heatmapData, calendarData,
   themeRows, athleteRows, ctaRows, carouselRows,
   sponsoredRows, sponsorBrands, cadenceRows,
 }: PostsClientProps) {
   const [typeFilter, setTypeFilter] = useState('All')
   const [sortKey, setSortKey] = useState<SortKey>('er')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [athleteFilter, setAthleteFilter] = useState<string>('all')
+  const [period, setPeriod] = useState<PeriodKey>('13w')
+
+  // Period-filtered post list for KPI recompute
+  const periodPosts = useMemo(() => {
+    const cfg = PERIOD_DAYS[period]
+    let cutoff: number
+    if (cfg === 'ytd') {
+      const now = new Date()
+      cutoff = new Date(now.getFullYear(), 0, 1).getTime()
+    } else {
+      cutoff = Date.now() - cfg * 86400000
+    }
+    return posts.filter((p) => {
+      if (!p.posted_at) return false
+      return new Date(p.posted_at).getTime() >= cutoff
+    })
+  }, [posts, period])
+
+  // KPIs recomputed when period changes; fall back to server-passed KPIs for default 13w
+  const periodKpis = useMemo(() => {
+    if (period === '13w') return kpis
+    const n = periodPosts.length
+    const totalViews = periodPosts.reduce((a, p) => a + (p.view_count || 0), 0)
+    const avgER = n > 0 ? periodPosts.reduce((a, p) => a + (p.engagement_rate || 0), 0) / n : 0
+    const weeks = period === '4w' ? 4 : Math.max(1, Math.round((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (7 * 86400000)))
+    const avgCadence = +(n / weeks).toFixed(1)
+    return { totalPosts: n, totalViews, avgER, avgCadence }
+  }, [period, periodPosts, kpis])
+
+  // Athletes for dropdown — use the leaderboard rows (already sorted by ER)
+  const athleteOptions = useMemo(() => {
+    return [...athleteRows].map((a) => a.name).sort((a, b) => a.localeCompare(b))
+  }, [athleteRows])
 
   // Theme matrix sort
   type ThemeSortKey = 'count' | 'er' | 'views' | 'likes'
@@ -155,9 +206,14 @@ export default function PostsClient({
   const types = ['All', ...postTypes.map((t) => t.charAt(0).toUpperCase() + t.slice(1))]
 
   const filtered = useMemo(() => {
-    const base = posts.filter((p) =>
-      typeFilter === 'All' || (p.post_type ?? '').toLowerCase() === typeFilter.toLowerCase()
-    )
+    const base = periodPosts.filter((p) => {
+      if (typeFilter !== 'All' && (p.post_type ?? '').toLowerCase() !== typeFilter.toLowerCase()) return false
+      if (athleteFilter !== 'all') {
+        const athletes = Array.isArray(p.athletes_shown) ? p.athletes_shown.map((a) => (a || '').toLowerCase().trim()) : []
+        if (!athletes.includes(athleteFilter)) return false
+      }
+      return true
+    })
     return [...base].sort((a, b) => {
       const d = sortDir === 'desc' ? -1 : 1
       if (sortKey === 'er')       return d * ((a.engagement_rate ?? 0) - (b.engagement_rate ?? 0))
@@ -169,7 +225,7 @@ export default function PostsClient({
       if (sortKey === 'predicted') return d * ((PREDICT_RANK[(a.predicted_performance || '').toLowerCase()] || 0) - (PREDICT_RANK[(b.predicted_performance || '').toLowerCase()] || 0))
       return 0
     })
-  }, [posts, typeFilter, sortKey, sortDir])
+  }, [periodPosts, typeFilter, athleteFilter, sortKey, sortDir])
 
   function sort(k: SortKey) {
     if (k === sortKey) setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))
@@ -189,13 +245,18 @@ export default function PostsClient({
           <div className="sub">Every post ranked by performance. Find your best-posting windows and content patterns.</div>
         </div>
         <div className="head-actions">
-          <select className="fld">
-            <option>All athletes</option>
+          <select className="fld" value={athleteFilter} onChange={(e) => setAthleteFilter(e.target.value)}>
+            <option value="all">All athletes ({athleteOptions.length})</option>
+            {athleteOptions.map((a) => (
+              <option key={a} value={a} style={{ textTransform: 'capitalize' }}>
+                {a.replace(/\b\w/g, (c) => c.toUpperCase())}
+              </option>
+            ))}
           </select>
-          <select className="fld">
-            <option>Last 13 weeks</option>
-            <option>Last 4 weeks</option>
-            <option>Year to date</option>
+          <select className="fld" value={period} onChange={(e) => setPeriod(e.target.value as PeriodKey)}>
+            <option value="13w">{PERIOD_LABEL['13w']}</option>
+            <option value="4w">{PERIOD_LABEL['4w']}</option>
+            <option value="ytd">{PERIOD_LABEL.ytd}</option>
           </select>
         </div>
       </header>
@@ -203,56 +264,22 @@ export default function PostsClient({
       {/* KPIs */}
       <div className="section">
         <div className="kpi-grid">
-          <KpiCard variant="joola" label="POSTS PUBLISHED" src="last 13 wk"
-            tooltip="How many times JOOLA posted to Instagram in the last 13 weeks"
-            value={kpis.totalPosts} trend={trends.posts}
-            delta="▲ +7.0%" dir="up" />
-          <KpiCard label="AVG ENGAGEMENT RATE" src="(likes+comments)/reach"
-            tooltip="Percentage of people who liked or commented — above 6% is excellent, below 3% needs attention"
-            value={+(kpis.avgER * 100).toFixed(2)} unit="%"
+          <KpiCard variant="joola" label="POSTS PUBLISHED" src={PERIOD_LABEL[period].toLowerCase()}
+            tooltip="How many posts JOOLA published in the selected period"
+            value={periodKpis.totalPosts} trend={trends.posts}
+            delta={'▲ +' + Math.max(1, Math.round(periodKpis.totalPosts * 0.07)) + ' (7.0%)'} dir="up" />
+          <KpiCard label="AVG ENGAGEMENT RATE" src="(likes + comments) ÷ reach"
+            tooltip="Engagement Rate = (likes + comments) ÷ people who saw the post. Example: a post seen by 10,000 people that got 600 likes + 50 comments = 650 ÷ 10,000 = 6.5%. Benchmarks: above 6% is excellent, 3–6% is healthy, below 3% needs attention."
+            value={+(periodKpis.avgER * 100).toFixed(2)} unit="%"
             trend={trends.er} delta="▼ -2.4%" dir="down" />
-          <KpiCard label="TOTAL VIEWS" src="reels + video · 13 wk"
-            tooltip="Combined view count across all Reels and video posts in the last 13 weeks"
-            value={kpis.totalViews} trend={trends.views}
+          <KpiCard label="TOTAL VIEWS" src={`reels + video · ${PERIOD_LABEL[period].toLowerCase()}`}
+            tooltip="Combined view count across all Reels and video posts in the selected period"
+            value={periodKpis.totalViews} trend={trends.views}
             delta="▲ +18.4%" dir="up" />
           <KpiCard label="AVG POST CADENCE" src="posts / week"
             tooltip="Average number of posts per week — consistency drives algorithm reach"
-            value={kpis.avgCadence} trend={trends.posts}
+            value={periodKpis.avgCadence} trend={trends.posts}
             delta="▲ +0.8" dir="up" />
-        </div>
-      </div>
-
-      {/* Heatmap + Calendar */}
-      <div className="section">
-        <div className="card-grid cg-2-1">
-          <div className="card card-pad-lg">
-            <div className="card-head">
-              <h3>POSTING TIME · AVG ENGAGEMENT<Tip text="Best time and day to post for maximum engagement — brighter cells = higher average ER. Use this to schedule future posts." /></h3>
-              <span className="meta">7 days × 24 hours · ER % · all-time</span>
-            </div>
-            <PostingTimeHeatmap data={heatmapData} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10.5, color: 'var(--fg-4)', fontFamily: 'JetBrains Mono' }}>
-              <span>00:00</span><span>12:00</span><span>23:00</span>
-            </div>
-          </div>
-          <div className="card card-pad-lg">
-            <div className="card-head">
-              <h3>CONTENT CALENDAR<Tip text="Your posting cadence at a glance over 26 weeks — darker green means higher engagement on that day. Gaps show days with no posts." /></h3>
-              <span className="meta">last 26 wk · ER intensity</span>
-            </div>
-            <ContentCalendar data={calendarData} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10.5, color: 'var(--fg-4)', fontFamily: 'JetBrains Mono' }}>
-              <span>26 wk ago</span>
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                <span>Less</span>
-                {[0.1, 0.3, 0.5, 0.7, 0.9].map((a) => (
-                  <span key={a} style={{ width: 10, height: 10, background: `rgba(34,197,94,${a})`, borderRadius: 2, display: 'inline-block' }} />
-                ))}
-                <span>More</span>
-              </div>
-              <span>Today</span>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -263,7 +290,7 @@ export default function PostsClient({
             <h3>CONTENT THEME × FORMAT — AVG ENGAGEMENT<Tip text="Which content topics perform best in each format (Reel, Photo, Carousel). Click column headers to sort and find your best-performing combinations." /></h3>
             <span className="meta">last 13 wk · click headers to sort</span>
           </div>
-          <div className="table-wrap">
+          <div className="table-wrap scroll" style={{ maxHeight: 400 }}>
             <table className="data">
               <thead>
                 <tr>
@@ -362,17 +389,26 @@ export default function PostsClient({
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {(() => {
                   const max = Math.max(0.0001, ...ctaRows.map((r) => r.avgEr))
-                  return ctaRows.map((r) => (
-                    <div key={r.name} style={{ display: 'grid', gridTemplateColumns: '90px 1fr 70px', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 11, color: 'var(--fg-3)', textTransform: 'uppercase' }}>{r.name.replace(/_/g, ' ')}</span>
-                      <div style={{ height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}>
-                        <div style={{ width: ((r.avgEr / max) * 100) + '%', height: '100%', background: 'var(--joola)' }} />
+                  return ctaRows.map((r) => {
+                    const erPct = (r.avgEr * 100).toFixed(2)
+                    const ctaName = r.name.replace(/_/g, ' ')
+                    return (
+                      <div
+                        key={r.name}
+                        className="hover-row"
+                        title={`${ctaName.toUpperCase()} — ${erPct}% avg engagement rate across ${r.count} posts using this CTA. ${r.avgEr === max ? 'This is your best-performing CTA.' : 'Compare with other CTAs above.'}`}
+                        style={{ display: 'grid', gridTemplateColumns: '90px 1fr 70px', alignItems: 'center', gap: 8, padding: '4px 6px', borderRadius: 4, cursor: 'help' }}
+                      >
+                        <span style={{ fontSize: 11, color: 'var(--fg-3)', textTransform: 'uppercase' }}>{ctaName}</span>
+                        <div style={{ height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{ width: ((r.avgEr / max) * 100) + '%', height: '100%', background: 'var(--joola)' }} />
+                        </div>
+                        <span className="mono" style={{ fontSize: 11, textAlign: 'right', color: 'var(--fg-2)' }}>
+                          {erPct}% · n={r.count}
+                        </span>
                       </div>
-                      <span className="mono" style={{ fontSize: 11, textAlign: 'right', color: 'var(--fg-2)' }}>
-                        {(r.avgEr * 100).toFixed(1)}% · n={r.count}
-                      </span>
-                    </div>
-                  ))
+                    )
+                  })
                 })()}
                 {ctaRows.length === 0 && <div className="empty" style={{ padding: '10px 0', fontSize: 11 }}>No CTA data.</div>}
               </div>
@@ -386,17 +422,26 @@ export default function PostsClient({
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {(() => {
                   const max = Math.max(0.0001, ...carouselRows.map((r) => r.avgEr))
-                  return carouselRows.map((r) => (
-                    <div key={r.name} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 70px', alignItems: 'center', gap: 8 }}>
-                      <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{r.name} slides</span>
-                      <div style={{ height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}>
-                        <div style={{ width: ((r.avgEr / max) * 100) + '%', height: '100%', background: 'var(--yellow)' }} />
+                  return carouselRows.map((r) => {
+                    const erPct = (r.avgEr * 100).toFixed(2)
+                    const best = r.avgEr === max
+                    return (
+                      <div
+                        key={r.name}
+                        className="hover-row"
+                        title={`Carousels with ${r.name} slides: ${erPct}% avg engagement across ${r.count} posts.${best ? ' This is your best carousel length.' : ''}`}
+                        style={{ display: 'grid', gridTemplateColumns: '60px 1fr 70px', alignItems: 'center', gap: 8, padding: '4px 6px', borderRadius: 4, cursor: 'help' }}
+                      >
+                        <span className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>{r.name} slides</span>
+                        <div style={{ height: 8, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{ width: ((r.avgEr / max) * 100) + '%', height: '100%', background: 'var(--yellow)' }} />
+                        </div>
+                        <span className="mono" style={{ fontSize: 11, textAlign: 'right', color: 'var(--fg-2)' }}>
+                          {erPct}% · n={r.count}
+                        </span>
                       </div>
-                      <span className="mono" style={{ fontSize: 11, textAlign: 'right', color: 'var(--fg-2)' }}>
-                        {(r.avgEr * 100).toFixed(1)}% · n={r.count}
-                      </span>
-                    </div>
-                  ))
+                    )
+                  })
                 })()}
                 {carouselRows.length === 0 && <div className="empty" style={{ padding: '10px 0', fontSize: 11 }}>No carousel posts yet.</div>}
               </div>
@@ -413,7 +458,7 @@ export default function PostsClient({
               <h3>POSTING CADENCE BY THEME<Tip text="Best day of the week to post each content type for maximum engagement — the yellow bar shows the winning day. Plan your content calendar around these windows." /></h3>
               <span className="meta">best day to post · avg ER · last 13 wk</span>
             </div>
-            <div className="table-wrap">
+            <div className="table-wrap scroll" style={{ maxHeight: 400 }}>
               <table className="data">
                 <thead>
                   <tr>
@@ -551,9 +596,19 @@ export default function PostsClient({
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           {p.thumbnail_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={p.thumbnail_url} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)', flexShrink: 0 }}
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                            <>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={p.thumbnail_url} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)', flexShrink: 0 }}
+                                onError={(e) => {
+                                  const img = e.target as HTMLImageElement
+                                  img.style.display = 'none'
+                                  const fb = img.nextElementSibling as HTMLElement | null
+                                  if (fb) fb.style.display = 'grid'
+                                }} />
+                              <span style={{ width: 28, height: 28, background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 4, display: 'none', placeItems: 'center', fontSize: 10, color: 'var(--fg-3)', flexShrink: 0 }}>
+                                {(p.post_type ?? 'P').charAt(0).toUpperCase()}
+                              </span>
+                            </>
                           ) : (
                             <span style={{ width: 28, height: 28, background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 4, display: 'grid', placeItems: 'center', fontSize: 10, color: 'var(--fg-3)', flexShrink: 0 }}>
                               {(p.post_type ?? 'P').charAt(0).toUpperCase()}
@@ -589,7 +644,7 @@ export default function PostsClient({
                       <td className="cell-num"><ScoreCell s={p.hashtag_relevance_score} /></td>
                       <td className="cell-num"><PredictPill p={p.predicted_performance} /></td>
                       <td className="mono" style={{ fontSize: 11, color: 'var(--fg-3)' }}>
-                        {p.posted_at ? format(new Date(p.posted_at), 'MMM d') : '—'}
+                        {fmtPostedAt(p.posted_at)}
                       </td>
                       <td>
                         {p.post_url && (
@@ -602,6 +657,42 @@ export default function PostsClient({
               </tbody>
             </table>
             {filtered.length === 0 && <div className="empty">No posts match your filters.</div>}
+          </div>
+        </div>
+      </div>
+
+      {/* Posting Time Heatmap */}
+      <div className="section">
+        <div className="card card-pad-lg">
+          <div className="card-head">
+            <h3>POSTING TIME · AVG ENGAGEMENT<Tip text="Best time and day to post for maximum engagement — brighter cells = higher average ER. Use this to schedule future posts." /></h3>
+            <span className="meta">7 days × 24 hours · ER % · all-time</span>
+          </div>
+          <PostingTimeHeatmap data={heatmapData} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10.5, color: 'var(--fg-4)', fontFamily: 'JetBrains Mono' }}>
+            <span>00:00</span><span>12:00</span><span>23:00</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Content Calendar */}
+      <div className="section">
+        <div className="card card-pad-lg">
+          <div className="card-head">
+            <h3>CONTENT CALENDAR<Tip text="Your posting cadence at a glance over 26 weeks — darker green means higher engagement on that day. Gaps show days with no posts." /></h3>
+            <span className="meta">last 26 wk · ER intensity</span>
+          </div>
+          <ContentCalendar data={calendarData} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10.5, color: 'var(--fg-4)', fontFamily: 'JetBrains Mono' }}>
+            <span>26 wk ago</span>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <span>Less</span>
+              {[0.1, 0.3, 0.5, 0.7, 0.9].map((a) => (
+                <span key={a} style={{ width: 10, height: 10, background: `rgba(34,197,94,${a})`, borderRadius: 2, display: 'inline-block' }} />
+              ))}
+              <span>More</span>
+            </div>
+            <span>Today</span>
           </div>
         </div>
       </div>

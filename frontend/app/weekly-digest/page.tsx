@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import WeeklyDigestClient from './WeeklyDigestClient'
-import type { IgWeeklySnapshot, IgPost, IgWishlistItem, IgComplaintLog, IgLoyalUser, IgCommentAnalysis } from '@/lib/types'
+import type { IgWeeklySnapshot, IgPost, IgPostAnalysis, IgWishlistItem, IgComplaintLog, IgLoyalUser, IgCommentAnalysis } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -9,6 +9,7 @@ export default async function WeeklyDigestPage() {
   const [
     { data: snapshots },
     { data: posts },
+    { data: postAnalysis },
     { data: wishlist },
     { data: complaints },
     { data: superFans },
@@ -27,6 +28,10 @@ export default async function WeeklyDigestPage() {
       .order('posted_at', { ascending: false })
       .limit(50)
       .returns<IgPost[]>(),
+    supabase
+      .from('joola_ig_post_analysis')
+      .select('post_id, content_theme')
+      .returns<Pick<IgPostAnalysis, 'post_id' | 'content_theme'>[]>(),
     supabase
       .from('joola_ig_wishlist_items')
       .select('*')
@@ -55,17 +60,60 @@ export default async function WeeklyDigestPage() {
       .returns<{ comment_id: string; commented_at: string }[]>(),
   ])
 
-  const snaps = snapshots ?? []
-  const postArr = posts ?? []
+  // Normalize engagement_rate (see posts/page.tsx) so downstream math is consistent.
+  const normEr = <T extends { engagement_rate?: number | null }>(p: T): T => {
+    const er = p.engagement_rate
+    if (er == null || isNaN(er)) return p
+    return { ...p, engagement_rate: er > 1 ? er / 100 : er }
+  }
+  const normSnapEr = <T extends { avg_engagement_rate?: number | null }>(w: T): T => {
+    const er = w.avg_engagement_rate
+    if (er == null || isNaN(er)) return w
+    return { ...w, avg_engagement_rate: er > 1 ? er / 100 : er }
+  }
+
+  const snaps = (snapshots ?? []).map(normSnapEr)
+  const postArr = (posts ?? []).map(normEr)
+  const postAnalysisArr = postAnalysis ?? []
   const wishArr = wishlist ?? []
   const complaintArr = complaints ?? []
   const superArr = superFans ?? []
   const analysisArr = analysis ?? []
   const commentArr = comments ?? []
 
+  // Build a post_id → content_theme map so we can compute the dominant theme
+  // for the current week even when the snapshot's dominant_content_theme is null.
+  const themeByPost = new Map(postAnalysisArr.map((a) => [a.post_id, a.content_theme]))
+
   // Latest week + prev week for deltas
-  const current = snaps[0]
+  let current = snaps[0]
   const previous = snaps[1]
+
+  // Backfill avg_engagement_rate and dominant_content_theme from the underlying
+  // post data when the snapshot row stores 0 / null for those fields (BUG-014/015).
+  if (current) {
+    const ws = new Date(current.week_start).getTime()
+    const we = new Date(current.week_end).getTime() + 24 * 60 * 60 * 1000
+    const weekPosts = postArr.filter((p) => {
+      if (!p.posted_at) return false
+      const t = new Date(p.posted_at).getTime()
+      return t >= ws && t < we
+    })
+    if ((!current.avg_engagement_rate || current.avg_engagement_rate === 0) && weekPosts.length > 0) {
+      const avgER = weekPosts.reduce((a, p) => a + (p.engagement_rate || 0), 0) / weekPosts.length
+      current = { ...current, avg_engagement_rate: avgER }
+    }
+    if (!current.dominant_content_theme && weekPosts.length > 0) {
+      const themeCounts: Record<string, number> = {}
+      for (const p of weekPosts) {
+        const theme = themeByPost.get(p.post_id)
+        if (!theme) continue
+        themeCounts[theme] = (themeCounts[theme] || 0) + 1
+      }
+      const top = Object.entries(themeCounts).sort(([, a], [, b]) => b - a)[0]
+      if (top) current = { ...current, dominant_content_theme: top[0] }
+    }
+  }
 
   function delta(curr: number | null | undefined, prev: number | null | undefined) {
     const c = curr ?? 0

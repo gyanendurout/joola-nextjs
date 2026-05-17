@@ -112,6 +112,7 @@ By combining real-time Instagram comment intelligence with automated SEO auditin
 - Google Search Console (GSC) integration for click/impression/CTR data
 - AI-generated SEO recommendations
 - Historical run comparison (trend over multiple crawls)
+- **News & Media Intelligence** — automated pickleball media scraping with AI classification (JOOLA mention detection, sponsored-player mention tracking, competitor mention surveillance, sentiment + importance scoring, suggested action routing)
 
 ### 4.2 Out of Scope
 
@@ -219,6 +220,22 @@ By combining real-time Instagram comment intelligence with automated SEO auditin
 - **FR-SEO-15**: Property selection (JOOLA domain)
 - **FR-SEO-16**: Automatic data refresh on each analysis run
 
+#### 6.2.4 News & Media Intelligence
+
+- **FR-SEO-17**: Operator triggers a scrape run from the In News page; backend returns a `run_id` immediately and processes asynchronously
+- **FR-SEO-18**: Real-time scrape progress via SSE: sites scraped / total, articles found / new / with mentions, JOOLA-related articles, per-source successes and failures
+- **FR-SEO-19**: Article extraction pulls title, excerpt, author, publication date, OG image, and full content from a registry of pickleball news sources (`news_sources` table)
+- **FR-SEO-20**: AI enrichment per article: sentiment (positive / negative / risk / informative / neutral / mixed), sentiment score, importance score (0–100), executive summary, "why it matters" rationale, suggested action label
+- **FR-SEO-21**: Entity detection: JOOLA brand mention (true/false), sponsored players mentioned (35-name canonical list), competitors mentioned (Selkirk, Head, Franklin, etc.), JOOLA mention context snippet
+- **FR-SEO-22**: Relevance classification per article (Direct JOOLA News, Sponsored Player News, Product/Brand News, Tournament/Performance News, Competitive News, Industry News, Not Relevant)
+- **FR-SEO-23**: Articles tab: filterable card grid by period (90 / 120 / 150 / 180 days), tone, mention type, relevance, suggested action, source, player, free-text search; sortable by date or importance; CSV export of the filtered set
+- **FR-SEO-24**: Article detail modal: full AI summary, "why it matters", JOOLA mention context, players + competitors mentioned, suggested action, link to original
+- **FR-SEO-25**: Smart Insights banner: AI-generated narrative summarizing the current filtered set (top player, top source, risk count, positive count, competitor count)
+- **FR-SEO-26**: Analytics tab: Player Media Visibility leaderboard (stacked bar: positive / informative / negative per player), Sentiment Mix bar chart, Relevance Types bar chart
+- **FR-SEO-27**: Sources tab: per-source coverage table — total articles, JOOLA mentions, player mentions, competitor mentions, positive, negative
+- **FR-SEO-28**: Duplicate detection via `content_hash` (SHA-256 of normalized title + excerpt) to avoid re-processing the same article across runs
+- **FR-SEO-29**: Per-source error log written to `news_scrape_errors` and surfaced in run history
+
 ---
 
 ## 7. Non-Functional Requirements
@@ -272,14 +289,24 @@ By combining real-time Instagram comment intelligence with automated SEO auditin
 | `joola_ig_weekly_snapshot` | Pre-aggregated weekly metrics: posts_published, avg_engagement_rate, total_views, sentiment breakdowns |
 | `joola_ig_wishlist_items` | Wishlist signals extracted from comments |
 
+### 8.1b News Intelligence Data (Supabase Tables)
+
+| Table | Description |
+|---|---|
+| `news_articles` | One row per article: url (unique), title, excerpt, ai_summary, why_it_matters, sentiment, sentiment_score, importance_score, is_joola_mention, joola_context, players_mentioned (array), competitors_mentioned (array), has_competitor_mention, relevance_type, suggested_action, source_site, published_at, scraped_at, content_hash |
+| `news_scrape_runs` | Per-run record: status, started_at, finished_at, sites_total, sites_scraped, articles_found, articles_new, articles_with_mentions, joola_related_articles, successful_sources, failed_sources |
+| `news_sources` | Site registry: domain, name, scraper_strategy, authority_score, last_success_at, last_failed_at |
+| `news_scrape_errors` | Per-site error log linked to a scrape run: source_site, error_type, message, http_status |
+
 ### 8.2 SEO Data
 
 | Source | Data Retrieved |
 |---|---|
 | **DataForSEO API** | Keyword search volume, difficulty, SERP results, domain rankings, backlinks |
 | **Google Search Console API** | Impressions, clicks, CTR, average position by query and page |
-| **OpenAI API** | AI-generated recommendations, entity extraction, gap analysis narratives |
+| **OpenAI API** | AI-generated recommendations, entity extraction, gap analysis narratives, article sentiment + importance + summary |
 | **Custom crawler (Python/FastAPI)** | On-page HTML parsing, technical issue detection |
+| **News scraper (Python/FastAPI)** | Pickleball news sites (`news_sources` registry); BeautifulSoup + httpx extraction with retry/backoff per source |
 
 ### 8.3 Infrastructure
 
@@ -399,6 +426,9 @@ User enters URL
 | SEO-3 | SEO dashboard (issues, keywords, SERP, backlinks) | ✅ Complete |
 | SEO-4 | GSC OAuth integration | ✅ Complete |
 | SEO-5 | AI recommendations panel | ✅ Complete |
+| SEO-8 | News & Media Intelligence module (scrape pipeline, SSE progress, articles/analytics/sources tabs) | ✅ Complete |
+| SEO-9 | AI article enrichment (sentiment, importance, summary, suggested action) | ✅ Complete |
+| SEO-10 | Player Media Visibility leaderboard | ✅ Complete |
 
 ### Phase 2 — Activation & Workflow (Next Quarter)
 
@@ -410,6 +440,9 @@ User enters URL
 | IG-16 | Background Studio Gallery (generated image library) | Low |
 | SEO-6 | Scheduled crawls (weekly automatic re-analysis) | High |
 | SEO-7 | Cross-run trend comparison (issue count, ranking delta) | Medium |
+| SEO-11 | Scheduled daily news scrape + email digest of risk articles | High |
+| SEO-12 | Share-of-voice chart (JOOLA vs competitors over time) | High |
+| SEO-13 | Multi-tone filter and date-range picker in News module | Medium |
 
 ### Phase 3 — Expansion (Future)
 
@@ -472,6 +505,10 @@ User enters URL
 | **Loyalty Tier** | Classification of fans into Super Fan or Regular Fan based on comment volume and recency |
 | **Purchase Intent** | AI-detected signal in a comment indicating the commenter is interested in buying a product |
 | **SERP** | Search Engine Results Page |
+| **Share of Voice** | JOOLA's share of total pickleball news mentions versus competitors over a given period |
+| **Importance Score** | AI-assigned 0–100 score per news article representing strategic importance to JOOLA (factors: mention type, sentiment, source authority, recency) |
+| **Suggested Action** | One of: Risk review, Share with marketing, PR opportunity, Sponsorship opportunity, Monitor competitor, Product feedback, Leadership review, Use for SEO/blog, No action needed |
+| **Relevance Type** | One of: Direct JOOLA News, Sponsored Player News, Product/Brand News, Tournament/Performance News, Competitive News, Industry News, Not Relevant |
 | **Sentiment Score** | Float from –1.0 to +1.0 assigned by AI to each comment; > 0.2 = positive, < –0.2 = negative, otherwise neutral |
 | **SSE** | Server-Sent Events — HTTP streaming protocol used to push real-time pipeline progress to the browser |
 | **Super Fan** | Highest loyalty tier; fans with the highest comment volume and most recent activity |

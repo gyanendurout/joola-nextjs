@@ -139,14 +139,14 @@ export default function FansClient({ allUsers, ambassadorList, superFans, regula
         </div>
       </div>
 
-      {/* Ambassador pipeline + tenure */}
+      {/* Ambassador pipeline — full width for breathing room */}
       <div className="section">
-        <div className="card-grid cg-2-1">
+        <div>
           {/* Pipeline table */}
           <div className="card card-pad-lg">
             <div className="card-head">
               <h3>AMBASSADOR PIPELINE<Tip text="All known fans ranked by ambassador score. Filter by type, click column headers to sort. Highlighted rows = potential ambassador picks." /></h3>
-              <div className="chip-row" style={{ flexWrap: 'wrap' }}>
+              <div className="chip-row" style={{ flexWrap: 'nowrap', overflowX: 'auto', paddingBottom: 2 }}>
                 <button className={'chip ' + (filter === 'all' ? 'on' : '')} onClick={() => setFilter('all')}>All ({allUsers.length})</button>
                 <button className={'chip ' + (filter === 'ambassador' ? 'on' : '')} onClick={() => setFilter('ambassador')}>Ambassador ({ambassadorList.length})</button>
                 <button className={'chip ' + (filter === 'super' ? 'on' : '')} onClick={() => setFilter('super')}>Super ({superFans})</button>
@@ -262,48 +262,57 @@ export default function FansClient({ allUsers, ambassadorList, superFans, regula
             </div>
           </div>
 
-          {/* Sidebar: tenure + scoring guide */}
-          <div>
-            <div className="card card-pad-lg" style={{ marginBottom: 14 }}>
-              <div className="card-head">
-                <h3>FAN TENURE<Tip text="Distribution of how long your fans have been engaged — more fans in the 7m+ buckets means a loyal, established community." /></h3>
-                <span className="meta">months active · all-time</span>
-              </div>
-              {bucketOrder.map((b) => {
-                const n = tenureBuckets[b] ?? 0
-                const pct = (n / maxBucket) * 100
-                return (
-                  <div className="bar-row" key={b}>
-                    <div className="lbl">{b}</div>
-                    <div className="track"><div className="fill" style={{ width: pct + '%' }} /></div>
-                    <div className="spark-mini">{n.toLocaleString()}</div>
-                    <div className={'delta-mini ' + (pct > 40 ? 'up' : 'flat')}>{Math.round(pct)}%</div>
-                  </div>
-                )
-              })}
+        </div>
+      </div>
+
+      {/* Tenure + scoring guide — full-width row at the bottom of the page */}
+      <div className="section">
+        <div className="card-grid cg-2">
+          <div className="card card-pad-lg">
+            <div className="card-head">
+              <h3>FAN TENURE<Tip text="Distribution of how long your fans have been engaged — more fans in the 7m+ buckets means a loyal, established community." /></h3>
+              <span className="meta">months active · all-time</span>
             </div>
-            <div className="card card-pad-lg">
-              <div className="card-head">
-                <h3>AMBASSADOR SCORING<Tip text="How the 0–10 ambassador score is calculated. Each factor contributes 25%. A score of 7.5+ means they're ready to be approached as a brand advocate." /></h3>
-                <span className="meta">0–10 scale</span>
-              </div>
-              {[
-                { label: 'Comment frequency', note: 'How often they comment' },
-                { label: 'Post diversity', note: 'Across how many posts' },
-                { label: 'Sentiment score', note: 'Average comment positivity' },
-                { label: 'Active months', note: 'Consistent engagement over time' },
-              ].map((f, i) => (
-                <div key={i} style={{ padding: '9px 0', borderBottom: '1px solid var(--line-2)', fontSize: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--fg)' }}>{f.label}</span>
-                    <span className="mono" style={{ fontSize: 10, color: 'var(--yellow)' }}>25%</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--fg-4)', marginTop: 2 }}>{f.note}</div>
+            {bucketOrder.map((b) => {
+              const n = tenureBuckets[b] ?? 0
+              const pct = (n / maxBucket) * 100
+              return (
+                <div className="bar-row" key={b}
+                  title={`${b}: ${n.toLocaleString()} fans (${Math.round(pct)}% of largest bucket)`}>
+                  <div className="lbl">{b}</div>
+                  <div className="track"><div className="fill" style={{ width: pct + '%' }} /></div>
+                  <div className="spark-mini">{n.toLocaleString()}</div>
+                  <div className={'delta-mini ' + (pct > 40 ? 'up' : 'flat')}>{Math.round(pct)}%</div>
                 </div>
-              ))}
-              <div style={{ marginTop: 10, fontSize: 11, color: 'var(--fg-3)' }}>
-                Avg score across all fans: <span className="mono" style={{ color: 'var(--yellow)', fontWeight: 700 }}>{avgScore}</span>
+              )
+            })}
+          </div>
+          <div className="card card-pad-lg">
+            <div className="card-head">
+              <h3>AMBASSADOR SCORING<Tip text="How the 0–10 ambassador score is calculated. Each factor contributes 25%. A score of 7.5+ means they're ready to be approached as a brand advocate." /></h3>
+              <span className="meta">0–10 scale · all-time</span>
+            </div>
+            {[
+              { label: 'Comment frequency', note: 'How often they comment', detail: 'Fans who comment 5+ times per month score highest on this factor. Sparse commenters score lower. This factor rewards volume of engagement.' },
+              { label: 'Post diversity', note: 'Across how many posts', detail: 'Fans commenting on many different posts (vs hammering one) score higher. This filters out one-off commenters and identifies fans engaged with the full content stream.' },
+              { label: 'Sentiment score', note: 'Average comment positivity', detail: 'Average AI sentiment across all their comments (-1.0 to +1.0). Positive fans become better ambassadors. Repeat negative scorers are filtered out of ambassador candidates.' },
+              { label: 'Active months', note: 'Consistent engagement over time', detail: 'Number of distinct months between first and most recent comment. Long-tenured fans (6m+) are most valuable for ambassador partnerships — they have proven loyalty.' },
+            ].map((f, i) => (
+              <div
+                key={i}
+                className="hover-row"
+                title={`${f.label} (25% weight) — ${f.detail}`}
+                style={{ padding: '9px 6px', borderBottom: '1px solid var(--line-2)', fontSize: 12, borderRadius: 4, cursor: 'help' }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--fg)' }}>{f.label}</span>
+                  <span className="mono" style={{ fontSize: 10, color: 'var(--yellow)' }}>25%</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--fg-4)', marginTop: 2 }}>{f.note}</div>
               </div>
+            ))}
+            <div style={{ marginTop: 10, fontSize: 11, color: 'var(--fg-3)' }}>
+              Avg score across all fans: <span className="mono" style={{ color: 'var(--yellow)', fontWeight: 700 }}>{avgScore}</span>
             </div>
           </div>
         </div>

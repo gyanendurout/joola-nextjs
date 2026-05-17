@@ -62,6 +62,11 @@ const NAV: Array<{ section: string; items: NavItem[] }> = [
     items: [
       { id: 'seo-analyze',    label: 'Run Analysis',       icon: 'pipeline',  href: '/seo-analyze' },
       { id: 'seo-dashboard',  label: 'Search Health',      icon: 'search',    href: '/seo-dashboard' },
+    ],
+  },
+  {
+    section: 'NEWS',
+    items: [
       { id: 'seo-news',       label: 'In News',            icon: 'news',      href: '/seo-news' },
     ],
   },

@@ -132,7 +132,8 @@ export default async function CommentsPage() {
 
   const uniqueUsers = new Set(allComments.map((c) => c.username)).size
   const questionsCount = allAnalysis.filter((a) => a.is_question).length
-  const purchaseIntentCount = allAnalysis.filter((a) => a.purchase_intent).length
+  // Count from enriched (joined) comments so the badge matches what the filter actually shows
+  const purchaseIntentCount = enriched.filter((c) => c.purchase_intent).length
   const competitorMentionsCount = allAnalysis.filter((a) => a.mentions_competitor).length
   const wishlistCount = allWishlist.length
 

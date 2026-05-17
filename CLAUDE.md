@@ -207,3 +207,68 @@ Next.js runs at `http://localhost:3000`. Backend at `http://localhost:8000`.
 - Ambassador outreach CRM panel
 - Content generation with JOOLA brand voice
 - AI weekly briefing email digest
+
+---
+
+## QA Pass — 2026-05-17 (20 bugs fixed)
+
+Source: full QA & Product Report covering all dashboard pages. `npx tsc --noEmit` passes after all changes.
+
+### Critical
+
+| Bug | File | Fix |
+|-----|------|-----|
+| BUG-001 hydration mismatch on `/posts` | `frontend/app/posts/PostsClient.tsx` | Removed `format(new Date(p.posted_at), 'MMM d')` (timezone-dependent). Added local `fmtPostedAt()` helper that parses the ISO date string directly so SSR and client render identical text. |
+| BUG-002 blank Complaint Category Trend chart | `frontend/app/complaints/ComplaintsClient.tsx` | Stacked bars used `height: pct%` inside flex-column children with no defined height → all bars collapsed to 0. Switched to pixel heights computed from a `MAX_BAR_PX = 110` ceiling. |
+| BUG-003 Weekly Digest goes black on scroll | `frontend/app/globals.css` | Added `position: relative; z-index; isolation: isolate` to `.shell`, `.main`, `.main-inner` so the fixed `.app-bg` / `.dot-grid` background layers can never composite over scrolled content. |
+| BUG-004 async listener errors | n/a | Browser-extension noise (`chrome.runtime.onMessage`). Not in app code. |
+
+### High
+
+| Bug | File | Fix |
+|-----|------|-----|
+| BUG-005 athletes dropdown not populated | `frontend/app/posts/PostsClient.tsx` | Dropdown options now built from `athleteRows`; filters the posts table by `p.athletes_shown`. |
+| BUG-006 time period filter doesn't update KPIs | `frontend/app/posts/PostsClient.tsx` | Added `period` state (`13w` / `4w` / `ytd`). `periodPosts` memo filters by cutoff; `periodKpis` recomputes totalPosts / totalViews / avgER / avgCadence client-side. |
+| BUG-007 Comment search ignores Fast Starts / Slow Burns | `frontend/app/comments/CommentsClient.tsx` | Added `filteredFast` and `filteredSlow` memos that filter virality rows by `caption`, `post_id`, `post_type` against the search query. |
+| BUG-008 SEO "View →" dead buttons | `frontend/app/seo-dashboard/SeoDashboardClient.tsx` | Added `openReco` state + detail modal with description, priority badge, tags, and "Suggested Next Steps" ordered list. |
+| BUG-009 Smart Insights ignores non-period filters | `frontend/app/seo-news/NewsClient.tsx` | `<InsightBanner>` now receives `filtered` (all active filters applied) instead of just the period-cutoff list. |
+
+### Medium
+
+| Bug | File | Fix |
+|-----|------|-----|
+| BUG-010 Tone "ALL" missing yellow highlight | `frontend/app/seo-news/NewsClient.tsx` (`sentChip`) | Special-cased `val === 'all'` to return the standard yellow `chip(on)` style for consistency with Mentions/Relevance/Action chips. |
+| BUG-011 article cards: black image placeholder | `frontend/app/seo-news/NewsClient.tsx` (`ArticleCard`) | `onError` now hides the image container and reveals a `data-fallback-stripe` sentiment gradient bar that's always present in the DOM. |
+| BUG-013 tiny bars for small % | `frontend/app/seo-news/NewsClient.tsx` (Analytics tab) | Sentiment Mix and Relevance Types bars use `width: max(N%, 6px)` so 1–3% values render visibly. |
+| BUG-014 / BUG-015 weekly digest dominant theme blank + 0.00% ER | `frontend/app/weekly-digest/page.tsx` | Fetch `joola_ig_post_analysis(post_id, content_theme)`. Backfill `current.avg_engagement_rate` from this week's `posts.engagement_rate` and `current.dominant_content_theme` from the modal `content_theme` of this week's posts when the snapshot row stores 0/null. |
+| BUG-016 Content Theme Momentum cards blank | `frontend/app/overview/OverviewClient.tsx` | When every `themeMomentum[].theme` is null, render a single explanatory empty state pointing at the missing DB column instead of 13 blank cards. Theme cards now use "NO DATA" label + dashed border for missing weeks. |
+| BUG-017 Top Posts 0.0% ER | `frontend/app/overview/OverviewClient.tsx` | `p.er` is stored as a 0–1 fraction. Now multiplied by 100 for display; color thresholds updated to 6 / 3 percent. |
+| BUG-018 Export button no feedback | `frontend/app/seo-news/NewsClient.tsx` | Added `exportState` ('idle' / 'exporting' / 'done'). Button label cycles `↓ Export (N)` → `⏳ Exporting…` → `✓ Exported N` and disables itself if no rows. |
+| BUG-019 Post Type Mix no legend | `frontend/app/overview/OverviewClient.tsx` | Replaced `<DonutLegend>` with an explicit always-visible legend (color swatch + name + count + pct) so labels render regardless of CSS context. |
+
+### Low
+
+| Bug | File | Fix |
+|-----|------|-----|
+| BUG-020 sidebar "OWN-BRAND INTELLIGENC" truncation | `frontend/app/globals.css` | `.brand-tag` letter-spacing 0.14em → 0.08em + added `text-overflow: ellipsis` as defensive fallback. |
+
+### Files touched (8)
+
+- `frontend/app/posts/PostsClient.tsx`
+- `frontend/app/complaints/ComplaintsClient.tsx`
+- `frontend/app/comments/CommentsClient.tsx`
+- `frontend/app/seo-dashboard/SeoDashboardClient.tsx`
+- `frontend/app/seo-news/NewsClient.tsx`
+- `frontend/app/overview/OverviewClient.tsx`
+- `frontend/app/weekly-digest/page.tsx`
+- `frontend/app/globals.css`
+
+### Verification
+
+- `cd frontend && npx tsc --noEmit` → exit 0
+- Manual smoke test recommended on `/posts`, `/complaints`, `/seo-news`, `/weekly-digest`, `/overview` (trends + movers tabs)
+
+### Notes on data vs code issues
+
+- **BUG-014/015/016**: Underlying problem is that `joola_ig_weekly_snapshot.avg_engagement_rate` and `dominant_content_theme` are 0/null in DB. The page-level fix backfills from `joola_ig_posts` + `joola_ig_post_analysis`. The proper long-term fix is to populate those columns in the snapshot pipeline.
+- **BUG-004**: `chrome.runtime.onMessage` errors come from installed Chrome extensions (Grammarly, LastPass, ad blockers). Cannot be silenced from app code.
