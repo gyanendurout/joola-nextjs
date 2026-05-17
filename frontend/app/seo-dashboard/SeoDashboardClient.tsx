@@ -17,6 +17,11 @@ interface Props {
 }
 
 function fmtNum(v: number) { return v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : v.toString() }
+const _MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+function _daysAgoLabel(n: number): string {
+  const end = new Date(); const start = new Date(end.getTime() - n * 86400000)
+  return `${_MO[start.getMonth()]} ${start.getDate()} – ${_MO[end.getMonth()]} ${end.getDate()}, ${end.getFullYear()}`
+}
 function fmtShort(v: number) { return v >= 1e3 ? (v/1e3).toFixed(0)+'K' : v.toString() }
 function humanize(code: string) {
   return code.replace(/_/g,' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
@@ -381,11 +386,11 @@ export default function SeoDashboardClient({
             value={issues.length}
             trend={[58,56,54,54,52,52,50,50,52,51,50,50,issues.length]}
             delta="▼ -8 this wk" dir="up" />
-          <KpiCard label="GSC CLICKS" src="last 28 days"
+          <KpiCard label="GSC CLICKS" src={_daysAgoLabel(28)}
             value={184000}
             trend={[200,210,215,212,208,205,200,196,194,190,188,186,184].map(v => v*1000)}
             delta="▼ -1.1%" dir="down" />
-          <KpiCard variant="joola" label="IMPRESSIONS" src="last 28 days"
+          <KpiCard variant="joola" label="IMPRESSIONS" src={_daysAgoLabel(28)}
             value={4824000}
             trend={[4400,4520,4600,4640,4680,4720,4760,4780,4790,4800,4810,4820,4824].map(v => v*1000)}
             delta="▲ +9.2%" dir="up" />
@@ -516,7 +521,7 @@ export default function SeoDashboardClient({
             <div className="card card-pad-lg" style={{ marginBottom: 14 }}>
               <div className="card-head">
                 <h3>RANK · &lsquo;pickleball paddles&rsquo;</h3>
-                <span className="meta">13 wk · GSC</span>
+                <span className="meta">{_daysAgoLabel(91)} · GSC</span>
               </div>
               <RankChart history={rankHistory} />
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 11.5 }}>
@@ -582,7 +587,7 @@ export default function SeoDashboardClient({
           </div>
 
           {/* Keywords */}
-          <div className="card card-pad-lg">
+          <div className="card card-pad-lg" style={{ display: 'flex', flexDirection: 'column' }}>
             <div className="card-head">
               <h3>KEYWORD OPPORTUNITIES <InfoTip text="Keywords people type into Google that are relevant to joola.com. The same keyword pool drives the Competitor Analysis below — competitors are sites that rank for these same terms." /></h3>
               <div className="chip-row" style={{ alignItems: 'center' }}>
@@ -594,7 +599,7 @@ export default function SeoDashboardClient({
                 ))}
               </div>
             </div>
-            <div className="table-wrap">
+            <div className="table-wrap" style={{ maxHeight: 420, overflowY: 'auto' }}>
               <table className="data">
                 <thead>
                   <tr>
